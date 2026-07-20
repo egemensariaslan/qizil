@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from qizil.ir.gates import GATES, qis_name  # noqa: E402
 from qizil.ir.values import format_double  # noqa: E402

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 
 import pytest
 
@@ -161,6 +162,35 @@ def test_missing_file_is_reported(capsys):
 def test_flags_may_precede_the_input(capsys):
     assert main(["--json", BELL]) == 0
     assert json.loads(capsys.readouterr().out)["level"] == 2
+
+
+def test_verify_reports_skipped_when_numpy_is_missing(monkeypatch, capsys):
+    from qizil.verify import unitary
+
+    def no_numpy():
+        raise unitary.Unsupported("numpy is required for verification")
+
+    monkeypatch.setattr(unitary, "_np", no_numpy)
+    # A skipped check must not look like a failed one: exit code stays 0.
+    assert main([BELL, "-O2", "--verify", "-o", os.devnull]) == 0
+    assert "verify: skipped" in capsys.readouterr().out
+    assert main(["verify", BELL, BELL]) == 1
+    assert "CANNOT VERIFY" in capsys.readouterr().out
+
+
+def test_module_entry_point_runs(tmp_path):
+    import subprocess
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = tmp_path / "out.ll"
+    proc = subprocess.run(
+        [sys.executable, "-m", "qizil", BELL, "-O2", "-o", str(out), "--quiet"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "@__quantum__qis__" in out.read_text()
 
 
 def test_no_arguments_prints_help(capsys):

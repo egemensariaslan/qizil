@@ -6,21 +6,46 @@ peephole cancellation, rotation fusion, commutation-based reordering and
 Clifford+T resynthesis, and writes back optimized QIR — with every classical
 instruction, basic block, measurement and piece of metadata exactly where it was.
 
-```console
-$ qizil circuit.ll -O2 -o optimized.ll --verify
+## Quick start
 
-qizil 0.1.0  circuit.ll  (-O2)
+Clone it and run one command. No install, no dependencies, any Python ≥ 3.10:
+
+```console
+git clone https://github.com/egemen/qizil && cd qizil
+
+python3 -m qizil examples/trotter_step.ll -O3 -o optimized.ll
+```
+
+```
+qizil 0.1.0  examples/trotter_step.ll  (-O3)
 
   metric                   before      after   change
   ----------------------------------------------------
-  quantum instructions         13          7   -46.2%
-  gates                        11          5   -54.5%
-  T gates                       2          0  -100.0%
-  exact T-count                 4          0  -100.0%
-  depth                        10          5   -50.0%
+  qubits                        4          4       0%
+  quantum instructions        104         76   -26.9%
+  gates                       100         72   -28.0%
+  1-qubit gates                76         50   -34.2%
+  2-qubit gates                24         22    -8.3%
+  arbitrary rotations          44         34   -22.7%
+  depth                        53         44   -17.0%
+  measurements                  4          4       0%
 
-  passes: cancel x2, merge-rotations x1, clifford-t x2  (2 iterations)
-  verify: unitary preserved over 1 segment(s), max error 2.78e-16
+  passes: cancel x9, merge-rotations x9, commute x1  (2 iterations)
+  gates:  cnot 24->22, h 32->16, mz 4, rz 44->34
+```
+
+Add `--verify` to have the rewrite *proved* against a reference simulator
+(this one needs numpy — without it the check reports `skipped`, never a false pass):
+
+```console
+python3 -m qizil examples/trotter_step.ll -O3 -o optimized.ll --verify
+#   verify: unitary preserved over 1 segment(s), max error 2.27e-15
+```
+
+Once installed (`pip install qizil`), the same command is just `qizil`:
+
+```console
+qizil input.ll -O2 -o output.ll
 ```
 
 **Zero runtime dependencies.** The parser, the DAG, the passes and the metrics
@@ -57,6 +82,9 @@ pytest
 ```
 
 ## Command line
+
+Everything below works as `qizil ...` once installed, or as
+`python3 -m qizil ...` straight from a clone.
 
 ```console
 qizil input.ll -O2 -o output.ll        # optimize (the subcommand is optional)
@@ -193,7 +221,7 @@ What the passes will **not** touch:
 - every line the passes did not rewrite, which is emitted **byte for byte** —
   `-O0` output is identical to the input.
 
-The test suite (319 tests) includes ~250 randomized circuits over 2–4 qubits
+The test suite (321 tests) includes ~250 randomized circuits over 2–4 qubits
 checked against a reference simulator at every optimization level, plus the
 same check on the tracked global phase.
 

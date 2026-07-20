@@ -34,10 +34,14 @@ class VerifyResult:
     max_error: float = 0.0
     global_phase: float = 0.0
     messages: list[str] = field(default_factory=list)
+    #: False when the check could not run at all (numpy missing).  Distinct
+    #: from ``ok=False``, which means the modules really are not equivalent.
+    available: bool = True
 
     def to_dict(self) -> dict:
         return {
             "equivalent": self.ok,
+            "available": self.available,
             "segments_checked": self.checked_segments,
             "segments_skipped": self.skipped_segments,
             "max_error": self.max_error,
@@ -231,13 +235,17 @@ def verify_equivalence(
     result = VerifyResult(ok=True)
     try:
         np = _np()
+    except Unsupported as exc:
+        return VerifyResult(ok=False, available=False, messages=[str(exc)])
+    try:
         index = _qubit_index([original, optimized])
     except Unsupported as exc:
-        return VerifyResult(ok=False, messages=[f"unsupported: {exc}"])
+        return VerifyResult(ok=False, available=False, messages=[f"unsupported: {exc}"])
     num_qubits = max(1, len(index))
     if num_qubits > MAX_QUBITS:
         return VerifyResult(
             ok=False,
+            available=False,
             skipped_segments=1,
             messages=[f"{num_qubits} qubits exceeds the {MAX_QUBITS}-qubit limit"],
         )

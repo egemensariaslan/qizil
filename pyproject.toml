@@ -38,15 +38,16 @@ Homepage = "https://github.com/egemen/qizil"
 Issues = "https://github.com/egemen/qizil/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/qizil"]
+packages = ["qizil"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 90
 target-version = "py310"
-src = ["src", "tests"]
+src = [".", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]

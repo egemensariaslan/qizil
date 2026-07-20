@@ -12,3 +12,4 @@ htmlcov/
 *.bc
 !examples/*.bc
 .DS_Store
+optimized.ll

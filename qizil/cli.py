@@ -168,6 +168,8 @@ def _summary(result, args) -> str:
                 f"  verify: unitary preserved over {v.checked_segments} segment(s), "
                 f"max error {v.max_error:.2e}"
             )
+        elif not v.available:
+            lines.append(f"  verify: skipped - {'; '.join(v.messages)}")
         else:
             lines.append("  verify: FAILED")
             for message in v.messages:
@@ -185,7 +187,8 @@ def _summary(result, args) -> str:
 
 
 def _exit_code(result, args) -> int:
-    if result.verification is not None and not result.verification.ok:
+    verification = result.verification
+    if verification is not None and not verification.ok and verification.available:
         return 2
     if result.llvm_diagnostic:
         return 3
@@ -298,6 +301,9 @@ def cmd_verify(args: argparse.Namespace) -> int:
     result = verify_equivalence(a, b, tol=args.tolerance)
     if args.json:
         print(json.dumps(result.to_dict(), indent=2))
+    elif not result.available:
+        print(f"\n  CANNOT VERIFY: {'; '.join(result.messages)}\n")
+        return 1
     else:
         status = "EQUIVALENT" if result.ok else "NOT EQUIVALENT"
         print(f"\n  {status}")
@@ -308,7 +314,9 @@ def cmd_verify(args: argparse.Namespace) -> int:
         for message in result.messages:
             print(f"  - {message}")
         print()
-    return 0 if result.ok else 2
+    if result.ok:
+        return 0
+    return 2 if result.available else 1
 
 
 def cmd_dag(args: argparse.Namespace) -> int:
