@@ -42,7 +42,8 @@ python3 -m qizil examples/trotter_step.ll -O3 -o optimized.ll --verify
 #   verify: unitary preserved over 1 segment(s), max error 2.27e-15
 ```
 
-Once installed (`pip install qizil`), the same command is just `qizil`:
+Install it once (see [Install](#install)) and the same command is just `qizil`,
+from any directory:
 
 ```console
 qizil input.ll -O2 -o output.ll
@@ -67,19 +68,31 @@ runtime.
 
 ## Install
 
+To get `qizil` as a command on your PATH, from a clone:
+
 ```console
-pip install qizil                       # core, no dependencies
-pip install 'qizil[bitcode]'            # + .bc input/output, LLVM verifier (PyQIR)
-pip install 'qizil[verify]'             # + unitary equivalence checking (numpy)
-pip install 'qizil[azure]'              # + Azure Quantum Resource Estimator
+uv tool install '.[verify,bitcode]'     # or: pipx install '.[verify,bitcode]'
+qizil input.ll -O2 -o output.ll
 ```
 
-From a checkout:
+Or into an active virtualenv:
 
 ```console
 pip install -e '.[dev]'
 pytest
 ```
+
+The extras are all optional; the core never needs them:
+
+| extra | adds | needs |
+| --- | --- | --- |
+| *(none)* | parsing, all four passes, metrics, estimator | — |
+| `bitcode` | `.bc` input/output, `--llvm-check` | PyQIR |
+| `verify` | `--verify` and `qizil verify` | numpy |
+| `azure` | the real Azure Quantum Resource Estimator backend | azure-quantum |
+
+> Not on PyPI yet. Once published, `pip install qizil` (or `uvx qizil …` to run
+> it without installing) replaces the clone step above.
 
 ## Command line
 
