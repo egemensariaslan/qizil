@@ -178,19 +178,46 @@ def test_verify_reports_skipped_when_numpy_is_missing(monkeypatch, capsys):
     assert "CANNOT VERIFY" in capsys.readouterr().out
 
 
-def test_module_entry_point_runs(tmp_path):
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SHIM = os.path.join(ROOT, "qizil")
+
+
+def test_root_shim_is_executable():
+    # This bit is what makes `./qizil ...` work straight out of a clone.
+    assert os.path.isfile(SHIM)
+    assert os.access(SHIM, os.X_OK)
+
+
+@pytest.mark.parametrize("cwd", [None, "tmp"])
+def test_root_shim_runs_without_installation(tmp_path, cwd):
+    """`./qizil` must work from a bare clone, from any directory."""
     import subprocess
 
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = tmp_path / "out.ll"
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    proc = subprocess.run(
+        [sys.executable, SHIM, BELL, "-O2", "-o", str(out), "--quiet"],
+        cwd=str(tmp_path) if cwd == "tmp" else ROOT,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "@__quantum__qis__" in out.read_text()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="no shebang on Windows")
+def test_root_shim_runs_via_shebang(tmp_path):
+    import subprocess
+
     out = tmp_path / "out.ll"
     proc = subprocess.run(
-        [sys.executable, "-m", "qizil", BELL, "-O2", "-o", str(out), "--quiet"],
-        cwd=root,
+        [SHIM, BELL, "-O2", "-o", str(out), "--quiet"],
         capture_output=True,
         text=True,
     )
     assert proc.returncode == 0, proc.stderr
-    assert "@__quantum__qis__" in out.read_text()
+    assert out.exists()
 
 
 def test_no_arguments_prints_help(capsys):

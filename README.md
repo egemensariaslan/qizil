@@ -8,12 +8,12 @@ instruction, basic block, measurement and piece of metadata exactly where it was
 
 ## Quick start
 
-Clone it and run one command. No install, no dependencies, any Python ≥ 3.10:
+Two commands. No install, no dependencies, no virtualenv — any Python ≥ 3.10:
 
 ```console
 git clone https://github.com/egemen/qizil && cd qizil
 
-python3 -m qizil examples/trotter_step.ll -O3 -o optimized.ll
+./qizil examples/trotter_step.ll -O3 -o optimized.ll
 ```
 
 ```
@@ -34,19 +34,18 @@ qizil 0.1.0  examples/trotter_step.ll  (-O3)
   gates:  cnot 24->22, h 32->16, mz 4, rz 44->34
 ```
 
+That is the whole setup. `./qizil` works from any directory
+(`/path/to/qizil/qizil input.ll -O2 -o out.ll`), and on Windows as
+`python qizil input.ll -O2 -o out.ll`.
+
 Add `--verify` to have the rewrite *proved* against a reference simulator
-(this one needs numpy — without it the check reports `skipped`, never a false pass):
+(the only flag that wants a dependency — without numpy it reports `skipped`,
+never a false pass):
 
 ```console
-python3 -m qizil examples/trotter_step.ll -O3 -o optimized.ll --verify
+pip install numpy
+./qizil examples/trotter_step.ll -O3 -o optimized.ll --verify
 #   verify: unitary preserved over 1 segment(s), max error 2.27e-15
-```
-
-Install it once (see [Install](#install)) and the same command is just `qizil`,
-from any directory:
-
-```console
-qizil input.ll -O2 -o output.ll
 ```
 
 **Zero runtime dependencies.** The parser, the DAG, the passes and the metrics
@@ -66,20 +65,14 @@ gate needs a magic state factory, and an *arbitrary-angle* rotation needs tens
 of `T` gates of synthesis. Cutting them cuts physical qubits and wall-clock
 runtime.
 
-## Install
+## Install (optional)
 
-To get `qizil` as a command on your PATH, from a clone:
+Nothing here is required — `./qizil` in a clone is fully functional. Install
+only if you want `qizil` on your PATH without the clone path:
 
 ```console
 uv tool install '.[verify,bitcode]'     # or: pipx install '.[verify,bitcode]'
-qizil input.ll -O2 -o output.ll
-```
-
-Or into an active virtualenv:
-
-```console
-pip install -e '.[dev]'
-pytest
+pip install -e '.[dev]'                 # or into an active virtualenv, + pytest
 ```
 
 The extras are all optional; the core never needs them:
@@ -96,8 +89,8 @@ The extras are all optional; the core never needs them:
 
 ## Command line
 
-Everything below works as `qizil ...` once installed, or as
-`python3 -m qizil ...` straight from a clone.
+Everything below works as `./qizil ...` from a clone, or as `qizil ...` once
+installed.
 
 ```console
 qizil input.ll -O2 -o output.ll        # optimize (the subcommand is optional)

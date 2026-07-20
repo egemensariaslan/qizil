@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""Run Qizil straight from a clone, with nothing installed.
+
+    ./qizil examples/trotter_step.ll -O3 -o optimized.ll
+
+On Windows, or if the file has lost its executable bit:
+
+    python qizil examples/trotter_step.ll -O3 -o optimized.ll
+
+The core has no dependencies, so this works on any stock Python 3.10+.
+"""
+
+import sys
+from pathlib import Path
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "qizil needs Python 3.10 or newer; this is "
+        f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+from qizil.cli import main  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(main())
