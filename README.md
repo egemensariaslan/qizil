@@ -48,10 +48,19 @@ pip install numpy
 #   verify: unitary preserved over 1 segment(s), max error 2.27e-15
 ```
 
-**Zero runtime dependencies.** The parser, the DAG, the passes and the metrics
-are pure Python stdlib. PyQIR is optional and only used at the edges (bitcode
-in/out, LLVM verification); numpy is optional and only used by the equivalence
-checker.
+See it, rather than read it — a browser UI with circuit diagrams, before/after
+charts, the rewrite trace and the equivalence proof:
+
+```console
+./qizil ui                                   # opens http://127.0.0.1:8731
+./qizil report input.ll -O3 -o report.html   # same page as one shareable file
+```
+
+**Zero runtime dependencies.** The parser, the DAG, the passes, the metrics,
+the equivalence checker and the UI are all pure Python stdlib — no numpy, no
+web framework, no CDN. PyQIR is optional and only used at the edges (bitcode
+in/out, LLVM verification); numpy is optional and only makes the equivalence
+check faster and wider.
 
 ---
 
@@ -81,11 +90,31 @@ The extras are all optional; the core never needs them:
 | --- | --- | --- |
 | *(none)* | parsing, all four passes, metrics, estimator | — |
 | `bitcode` | `.bc` input/output, `--llvm-check` | PyQIR |
-| `verify` | `--verify` and `qizil verify` | numpy |
+| `verify` | faster checking, up to 12 qubits (the check itself needs nothing) | numpy |
 | `azure` | the real Azure Quantum Resource Estimator backend | azure-quantum |
 
 > Not on PyPI yet. Once published, `pip install qizil` (or `uvx qizil …` to run
 > it without installing) replaces the clone step above.
+
+## The UI
+
+`./qizil ui` serves a local page (stdlib `http.server`, loopback only) that
+runs the pipeline live: pick a circuit, slide between `-O0` and `-O3`, and
+watch what each level does.
+
+| panel | what it shows |
+| --- | --- |
+| proof banner | equivalence verdict, max matrix error, segments checked, simulator used, global phase, LLVM verdict |
+| circuit | the actual circuit before and after — qubit wires, CNOT controls, rotation angles, T gates highlighted; hover a gate for its QIR instruction |
+| metrics | before/after bars for instructions, gates, depth, T-count, arbitrary rotations |
+| fault-tolerant resources | logical qubits, code distance, T states, physical qubits, runtime |
+| rewrite trace | every rewrite with the identity that justifies it (`h(q0) · h(q0) = I`) |
+| gates by kind | histogram of every operation |
+| QIR diff | the changed lines, with everything else emitted byte for byte |
+
+`./qizil report input.ll -o report.html` writes the same page as a single
+self-contained file — CSS, JS and data inlined, no network access — for a
+paper, a PR comment, or a CI artifact.
 
 ## Command line
 
@@ -98,6 +127,8 @@ qizil input.bc -O3 -o output.bc        # bitcode in, bitcode out
 qizil stats input.ll                   # gate counts, depth, T-count
 qizil estimate input.ll -O2            # fault-tolerant resources, before vs after
 qizil verify before.ll after.ll        # prove two modules are the same unitary
+qizil ui                               # browser UI: diagrams, charts, proof
+qizil report input.ll -o report.html   # standalone HTML report
 qizil dag input.ll --dot | dot -Tsvg   # visualize the instruction graph
 qizil passes                           # list passes and pipelines
 ```
@@ -227,7 +258,7 @@ What the passes will **not** touch:
 - every line the passes did not rewrite, which is emitted **byte for byte** —
   `-O0` output is identical to the input.
 
-The test suite (321 tests) includes ~250 randomized circuits over 2–4 qubits
+The test suite (369 tests) includes ~250 randomized circuits over 2–4 qubits
 checked against a reference simulator at every optimization level, plus the
 same check on the tracked global phase.
 
@@ -319,7 +350,8 @@ Known, deliberate, and each one fails safe (the code is left alone):
 - rotations with symbolic (SSA) angles are never fused;
 - no gate *decomposition* or *resynthesis* beyond exact Clifford+T runs — Qizil
   never expands a gate into a longer sequence to look for a win;
-- the equivalence checker is a dense simulator, capped at 12 qubits;
+- the equivalence checker is a dense simulator: 8 qubits on the dependency-free
+  backend, 12 with numpy installed;
 - multi-line LLVM instructions are handled for bracketed forms (`switch`) only.
 
 ## License

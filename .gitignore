@@ -13,3 +13,5 @@ htmlcov/
 !examples/*.bc
 .DS_Store
 optimized.ll
+qizil-report.html
+*-report.html

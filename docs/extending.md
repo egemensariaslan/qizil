@@ -93,7 +93,7 @@ Register the pass in `qizil.passes.manager.PASS_REGISTRY` and add it to the
 
 ```console
 pip install -e '.[dev]'
-pytest                      # 321 tests, well under a second
+pytest                      # 369 tests, a few seconds
 pytest tests/test_semantics.py -q     # randomized equivalence only
 ```
 

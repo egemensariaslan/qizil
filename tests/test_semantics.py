@@ -131,3 +131,53 @@ def test_verifier_catches_reordered_measurements():
     )
     result = verify_equivalence(original, parse_ll(swapped_text))
     assert not result.ok
+
+
+# --------------------------------------------------------------------------
+# Backend agreement: the dependency-free simulator must match numpy exactly
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("seed", SEEDS[:20])
+def test_backends_agree(seed):
+    import random
+
+    from qizil.verify import accelerated, simulator
+
+    if not accelerated.available():
+        pytest.skip("numpy not installed")
+
+    rng = random.Random(5000 + seed)
+    num_qubits = rng.choice([2, 3])
+    gates = random_gates(rng, 18, num_qubits)
+    module = parse_ll(make_ir(gates, num_qubits))
+    ops = [
+        inst.op
+        for _fn, block in module.blocks()
+        for inst in block.instructions
+        if inst.op is not None and inst.op.is_gate
+    ]
+    keys = sorted({q.key for op in ops for q in op.qubits}, key=repr)
+    index = {k: i for i, k in enumerate(keys)}
+    n = max(1, len(index))
+
+    pure = simulator.unitary_of_segment(ops, index, n)
+    fast = accelerated.unitary_of_segment(ops, index, n)
+    worst = max(
+        abs(pure[j][i] - fast[i][j]) for i in range(1 << n) for j in range(1 << n)
+    )
+    assert worst < 1e-12, worst
+
+
+def test_pure_backend_verifies_without_numpy(monkeypatch):
+    from qizil.verify import accelerated
+
+    monkeypatch.setattr(accelerated, "available", lambda: False)
+    result = optimize(
+        make_ir([("t", "body", None, [0])] * 8 + [("h", "body", None, [1])] * 2, 2),
+        level=3,
+        verify=True,
+    )
+    assert result.verification.backend == "python"
+    assert result.verification.ok, result.verification.messages
+    assert result.after.gates == 0

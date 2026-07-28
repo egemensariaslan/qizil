@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qizil — QIR optimization report</title>
+<style>/*[CSS]*/</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="mark">Qizil</span>
+    <span class="tag">QIR&#8209;Opt</span>
+  </div>
+  <p class="lede">
+    Peephole, rotation-fusion and commutation passes over Quantum Intermediate
+    Representation — with the rewrite checked against a reference simulator.
+  </p>
+  <code class="cmd" id="cmd">qizil input.ll -O3 -o optimized.ll --verify</code>
+</header>
+
+<section class="controls" id="controls" hidden>
+  <div class="field">
+    <label for="example">Circuit</label>
+    <select id="example"></select>
+  </div>
+  <div class="field">
+    <label for="level">Optimization</label>
+    <div class="segmented" id="level" role="radiogroup" aria-label="Optimization level"></div>
+  </div>
+  <div class="field">
+    <label for="gateset">Gate set</label>
+    <select id="gateset">
+      <option value="auto">auto — may introduce S/T/Z/Rz</option>
+      <option value="strict">strict — only gates already used</option>
+    </select>
+  </div>
+  <div class="field checks">
+    <label class="check"><input type="checkbox" id="phase"> preserve global phase</label>
+    <label class="check"><input type="checkbox" id="verify" checked> verify equivalence</label>
+  </div>
+  <div class="field grow">
+    <label for="file">Your own module</label>
+    <input type="file" id="file" accept=".ll,.txt">
+  </div>
+  <button id="run" class="run">Optimize</button>
+</section>
+
+<div id="status" class="status" hidden></div>
+
+<main id="app" class="app"></main>
+
+<footer class="foot">
+  <span id="footnote"></span>
+</footer>
+
+<script>/*[DATA]*/</script>
+<script>/*[JS]*/</script>
+</body>
+</html>

@@ -164,18 +164,27 @@ def test_flags_may_precede_the_input(capsys):
     assert json.loads(capsys.readouterr().out)["level"] == 2
 
 
-def test_verify_reports_skipped_when_numpy_is_missing(monkeypatch, capsys):
-    from qizil.verify import unitary
+def test_verify_reports_skipped_when_it_cannot_run(monkeypatch, capsys):
+    from qizil.verify import accelerated, simulator
 
-    def no_numpy():
-        raise unitary.Unsupported("numpy is required for verification")
-
-    monkeypatch.setattr(unitary, "_np", no_numpy)
+    # Force the dependency-free backend, then shrink it below the circuit.
+    monkeypatch.setattr(accelerated, "available", lambda: False)
+    monkeypatch.setattr(simulator, "MAX_QUBITS", 1)
     # A skipped check must not look like a failed one: exit code stays 0.
     assert main([BELL, "-O2", "--verify", "-o", os.devnull]) == 0
     assert "verify: skipped" in capsys.readouterr().out
     assert main(["verify", BELL, BELL]) == 1
     assert "CANNOT VERIFY" in capsys.readouterr().out
+
+
+def test_verification_works_without_numpy(monkeypatch, capsys):
+    from qizil.verify import accelerated
+
+    monkeypatch.setattr(accelerated, "available", lambda: False)
+    assert main([BELL, "-O3", "--verify", "-o", os.devnull, "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["verification"]["equivalent"] is True
+    assert data["verification"]["backend"] == "python"
 
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

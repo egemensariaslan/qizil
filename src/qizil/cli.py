@@ -11,19 +11,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from . import __version__
 from .analysis.estimator import QUBIT_PRESETS, compare, estimate
 from .analysis.metrics import measure
-from .api import optimize, parse
+from .api import optimize, parse, read_source
 from .ir.bitcode import have_pyqir, to_bitcode
 from .ir.dag import BlockDag
 from .passes import PASS_REGISTRY, PIPELINES
 
 __all__ = ["main", "build_parser"]
 
-SUBCOMMANDS = ("optimize", "stats", "estimate", "verify", "dag", "passes")
+SUBCOMMANDS = (
+    "optimize",
+    "stats",
+    "estimate",
+    "verify",
+    "report",
+    "ui",
+    "dag",
+    "passes",
+)
 
 
 # --------------------------------------------------------------------------
@@ -345,6 +355,46 @@ def cmd_dag(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ui(args: argparse.Namespace) -> int:
+    from .ui.server import serve
+
+    serve(
+        host=args.host,
+        port=args.port,
+        open_browser=not args.no_browser,
+        quiet=not args.verbose,
+    )
+    return 0
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    from .ui.payload import build
+    from .ui.server import render_page
+
+    source = read_source(args.input)
+    name = args.input if "\n" not in args.input else "<stdin>"
+    data = build(
+        source,
+        name=os.path.basename(name),
+        level=args.opt_level,
+        gateset=args.gateset,
+        preserve_global_phase=args.preserve_global_phase,
+        verify=not args.no_verify,
+        error_budget=args.error_budget,
+        qubit_params=args.qubit_params,
+    )
+    data["version"] = __version__
+    html = render_page(data)
+    with open(args.output, "w", encoding="utf-8") as fh:
+        fh.write(html)
+    size = len(html.encode("utf-8")) / 1024
+    print(f"  report written to {args.output}  ({size:.0f} KB, self-contained)")
+    verification = data.get("verification")
+    if verification and not verification["equivalent"] and verification["available"]:
+        return 2
+    return 0
+
+
 def cmd_passes(args: argparse.Namespace) -> int:
     print("\n  available passes\n")
     width = max(len(n) for n in PASS_REGISTRY)
@@ -475,6 +525,35 @@ def build_parser() -> argparse.ArgumentParser:
     dag.add_argument("--block", help="only this basic block label")
     _add_common(dag)
     dag.set_defaults(func=cmd_dag)
+
+    report = subparsers.add_parser(
+        "report", help="write a standalone HTML report (charts, circuit, proof)"
+    )
+    report.add_argument("input")
+    report.add_argument(
+        "-o", "--output", default="qizil-report.html", help="output HTML file"
+    )
+    _add_opt_flags(report)
+    report.add_argument(
+        "--error-budget", type=float, default=1e-3, help="resource estimate budget"
+    )
+    report.add_argument(
+        "--qubit-params",
+        default="qubit_gate_ns_e3",
+        choices=sorted(QUBIT_PRESETS),
+        help="physical qubit model",
+    )
+    report.add_argument(
+        "--no-verify", action="store_true", help="skip the equivalence check"
+    )
+    report.set_defaults(func=cmd_report)
+
+    ui = subparsers.add_parser("ui", help="open the browser UI")
+    ui.add_argument("--port", type=int, default=8731)
+    ui.add_argument("--host", default="127.0.0.1")
+    ui.add_argument("--no-browser", action="store_true", help="do not open a browser")
+    ui.add_argument("-v", "--verbose", action="store_true", help="log requests")
+    ui.set_defaults(func=cmd_ui)
 
     passes = subparsers.add_parser("passes", help="list passes and pipelines")
     passes.set_defaults(func=cmd_passes)
