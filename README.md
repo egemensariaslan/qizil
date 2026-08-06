@@ -100,7 +100,9 @@ The extras are all optional; the core never needs them:
 
 `./qizil ui` serves a local page (stdlib `http.server`, loopback only) that
 runs the pipeline live: pick a circuit, slide between `-O0` and `-O3`, and
-watch what each level does.
+watch what each level does. Dark by default with a light toggle, no web fonts
+and no CDN — see [docs/design-system.md](docs/design-system.md) for the visual
+language and how to add a panel to it.
 
 | panel | what it shows |
 | --- | --- |
