@@ -32,29 +32,30 @@
   --ink-2: #9aa3b2;
   --ink-3: #626c7d;
 
-  /* signal */
-  --accent: #7b86ff;
-  --accent-2: #a78bfa;
-  --accent-ink: #cdd2ff;
-  --accent-bg: rgba(123, 134, 255, 0.13);
-  --accent-line: rgba(123, 134, 255, 0.35);
-  --glow: rgba(123, 134, 255, 0.22);
+  /* signal — qizil: sharp red. One red family carries both the brand and
+     "costs you something"; green carries improvement. */
+  --accent: #f2453d;
+  --accent-2: #b52820;
+  --accent-ink: #ff9d95;
+  --accent-bg: rgba(242, 69, 61, 0.13);
+  --accent-line: rgba(242, 69, 61, 0.38);
+  --glow: rgba(242, 69, 61, 0.16);
 
   --ok: #45d49b;
   --ok-bg: rgba(69, 212, 155, 0.11);
   --ok-line: rgba(69, 212, 155, 0.32);
-  --bad: #ff6f61;
-  --bad-bg: rgba(255, 111, 97, 0.11);
-  --bad-line: rgba(255, 111, 97, 0.32);
-  --warn: #f2b45f;
-  --warn-bg: rgba(242, 180, 95, 0.11);
-  --warn-line: rgba(242, 180, 95, 0.32);
+  --bad: #f2453d;
+  --bad-bg: rgba(242, 69, 61, 0.12);
+  --bad-line: rgba(242, 69, 61, 0.34);
+  --warn: #e0a63f;
+  --warn-bg: rgba(224, 166, 63, 0.11);
+  --warn-line: rgba(224, 166, 63, 0.32);
 
   /* gate semantics */
   --clifford: #78a9ff;
   --clifford-bg: rgba(120, 169, 255, 0.13);
-  --tgate: #f5a962;
-  --tgate-bg: rgba(245, 169, 98, 0.15);
+  --tgate: #f2b544;
+  --tgate-bg: rgba(242, 181, 68, 0.15);
   --rot: #bb8cf5;
   --rot-bg: rgba(187, 140, 245, 0.13);
   --two: #5fd6b6;
@@ -88,25 +89,25 @@
   --ink: #0b0e14;
   --ink-2: #4e5867;
   --ink-3: #7b8493;
-  --accent: #4a45d6;
-  --accent-2: #7c4ddb;
-  --accent-ink: #322db4;
-  --accent-bg: rgba(74, 69, 214, 0.08);
-  --accent-line: rgba(74, 69, 214, 0.28);
-  --glow: rgba(74, 69, 214, 0.13);
+  --accent: #cf2c22;
+  --accent-2: #94180f;
+  --accent-ink: #a11f16;
+  --accent-bg: rgba(207, 44, 34, 0.08);
+  --accent-line: rgba(207, 44, 34, 0.3);
+  --glow: rgba(207, 44, 34, 0.1);
   --ok: #0d7a55;
   --ok-bg: rgba(13, 122, 85, 0.09);
   --ok-line: rgba(13, 122, 85, 0.28);
-  --bad: #c0362a;
-  --bad-bg: rgba(192, 54, 42, 0.08);
-  --bad-line: rgba(192, 54, 42, 0.26);
-  --warn: #9a6413;
-  --warn-bg: rgba(154, 100, 19, 0.09);
-  --warn-line: rgba(154, 100, 19, 0.26);
+  --bad: #cf2c22;
+  --bad-bg: rgba(207, 44, 34, 0.08);
+  --bad-line: rgba(207, 44, 34, 0.28);
+  --warn: #8a5b10;
+  --warn-bg: rgba(138, 91, 16, 0.09);
+  --warn-line: rgba(138, 91, 16, 0.26);
   --clifford: #2f62c4;
   --clifford-bg: rgba(47, 98, 196, 0.1);
-  --tgate: #a75f0c;
-  --tgate-bg: rgba(167, 95, 12, 0.12);
+  --tgate: #91630a;
+  --tgate-bg: rgba(145, 99, 10, 0.12);
   --rot: #6d3ab8;
   --rot-bg: rgba(109, 58, 184, 0.1);
   --two: #14705c;
@@ -150,8 +151,8 @@ body {
   position: fixed;
   inset: 0 0 auto;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2), transparent 72%);
-  opacity: 0.85;
+  background: var(--accent);
+  opacity: 0.9;
   z-index: 9;
 }
 
@@ -173,50 +174,29 @@ body.busy .progress { width: 72%; opacity: 0.9; }
 .masthead {
   max-width: var(--page);
   margin: 0 auto;
-  padding: 44px 0 26px;
-}
-.masthead-row { display: flex; align-items: center; gap: 16px; }
-.brand { display: flex; align-items: center; gap: 11px; }
-.wordmark {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-}
-.badge {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--accent-ink);
-  background: var(--accent-bg);
-  border: 1px solid var(--accent-line);
-  border-radius: 5px;
-  padding: 3px 7px;
-}
-.masthead-tools { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-
-.verdict {
-  display: inline-flex;
+  padding: 34px 0 22px;
+  display: flex;
   align-items: center;
-  gap: 7px;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 5px 11px;
-  border-radius: 999px;
-  border: 1px solid var(--line-2);
-  color: var(--ink-2);
+  flex-wrap: wrap;
+  gap: 16px;
 }
-.verdict::before {
+.wordmark {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--ink);
+}
+.wordmark::after {
   content: "";
+  display: inline-block;
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+  margin-left: 9px;
+  border-radius: 1px;
+  background: var(--accent);
+  vertical-align: middle;
 }
-.verdict.ok { color: var(--ok); border-color: var(--ok-line); background: var(--ok-bg); }
-.verdict.warn { color: var(--warn); border-color: var(--warn-line); background: var(--warn-bg); }
-.verdict.fail { color: var(--bad); border-color: var(--bad-line); background: var(--bad-bg); }
+.masthead .ghost { margin-left: auto; }
 
 .ghost {
   font-family: var(--mono);
@@ -232,16 +212,9 @@ body.busy .progress { width: 72%; opacity: 0.9; }
 }
 .ghost:hover { color: var(--ink); border-color: var(--ink-3); background: var(--sheen); }
 
-.deck {
-  margin: 20px 0 18px;
-  max-width: 64ch;
-  font-size: 15.5px;
-  line-height: 1.6;
-  color: var(--ink-2);
-}
-
 .command {
-  display: inline-block;
+  display: block;
+  flex: 1 1 320px;
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ink-2);
@@ -503,22 +476,16 @@ input[type="file"] { color: var(--ink-2); font-size: 11px; }
   border-color: var(--bad-line);
   background: linear-gradient(90deg, var(--bad-bg), transparent 58%), var(--bg-2);
 }
-.proof .seal {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  font-size: 15px;
-  border: 1px solid currentColor;
-}
-.proof.ok .seal { color: var(--ok); box-shadow: 0 0 22px -6px var(--ok); }
+.proof .seal { flex: none; font-size: 15px; line-height: 1; }
+.proof.ok .seal { color: var(--ok); }
 .proof.warn .seal { color: var(--warn); }
 .proof.fail .seal { color: var(--bad); }
-.proof .claim { display: flex; flex-direction: column; gap: 2px; }
-.proof .claim b { font-size: 15px; font-weight: 640; letter-spacing: -0.01em; }
-.proof .claim span { font-size: 12.5px; color: var(--ink-2); }
+.proof .claim {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
 .proof .facts { margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px 26px; }
 .proof .fact { display: flex; flex-direction: column; gap: 3px; }
 .proof .fact .fk {

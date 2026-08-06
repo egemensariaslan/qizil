@@ -11,7 +11,7 @@ read as evidence:
 
 | influence | what it contributes |
 | --- | --- |
-| **Linear / Vercel dark minimalism** | near-black surface, 1px hairline separation instead of shadows, a single signal accent, glow used only where it means something |
+| **Linear / Vercel dark minimalism** | near-black surface, 1px hairline separation instead of shadows, a single signal accent |
 | **Swiss editorial typography** | numbered sections, small-caps rails with wide tracking, a strict 12-column grid, tabular figures, information ordered by hierarchy rather than decoration |
 | **Bento grid** | cells of varying span (5/7, 6/6, 12) so panel size tracks panel importance |
 
@@ -21,14 +21,18 @@ in the masthead and remembers your choice in `localStorage`.
 
 ## Rules
 
-1. **One accent carries state.** Indigo (`--accent`) means "this is the
-   optimized side" and nothing else. Green/amber/red mean verified / unchecked /
-   mismatched.
+1. **Red is the brand and the cost signal.** *Qızıl* is Turkic for a sharp red,
+   so `--accent` is red and it does double duty: it marks the optimized side
+   (the "after" bar, the active `-O`, section numbers) and it marks anything
+   that costs you — a regression, a deleted line, a failed proof. One red
+   family, disambiguated by context. Green is the only "this got better"
+   colour.
 2. **Category colour is reserved for gate semantics.** `--clifford`,
-   `--tgate`, `--rot`, `--two`, `--meter` say what a gate *is*. Never reuse them
-   as decoration — a reader must be able to trust that amber means T gate.
-3. **Separation is a hairline, never a shadow.** The only glow in the system is
-   on a verified proof seal and the active `-O` button.
+   `--tgate`, `--rot`, `--two`, `--meter` say what a gate *is*. Never reuse
+   them as decoration — a reader must be able to trust that gold means T gate.
+   (Gold is the other half of *qızıl*, which also names the metal.)
+3. **Separation is a hairline, never a shadow.** One glow in the system: the
+   active `-O` button and the primary action.
 4. **Every number is monospace and tabular.** `font-variant-numeric:
    tabular-nums` is set on `body`; digits must align down a column.
 5. **Motion is 150–650ms, ease-out, and never blocks reading.** Cells rise 12px
@@ -37,6 +41,10 @@ in the masthead and remembers your choice in `localStorage`.
 6. **Nothing loads from the network.** No web fonts, no CDN, no icon library —
    a report has to render offline in ten years. Type is the system stack;
    symbols are Unicode.
+7. **Every string must do work.** No taglines, no restating what a panel
+   obviously shows, no status shown twice in two places. A label names a
+   number, a caption carries a parameter or a count, an empty state explains
+   why it is empty. If a sentence would survive being deleted, delete it.
 
 ## Tokens
 
@@ -49,7 +57,7 @@ surfaces   --bg  --bg-2  --bg-3  --bg-4      four planes, darkest at the back
 lines      --line  --line-2  --sheen         hairlines and the top-edge gradient
 ink        --ink  --ink-2  --ink-3           primary / secondary / tertiary text
 signal     --accent --accent-2 --accent-ink --accent-bg --accent-line --glow
-state      --ok  --bad  --warn (+ -bg, -line)
+state      --ok (green) --bad (= the accent red) --warn (amber) (+ -bg, -line)
 gates      --clifford --tgate --rot --two --meter (+ -bg)
 type       --sans  --mono
 geometry   --r  --r-sm  --gap  --page  --ease
@@ -60,9 +68,10 @@ geometry   --r  --r-sm  --gap  --page  --ease
 | role | size | family | tracking |
 | --- | --- | --- | --- |
 | hero stat | 27px / 600 | mono | −0.02em |
+| masthead wordmark | 19px / 700 | sans | 0.18em |
 | section title | 11.5px / 650 | sans, uppercase | 0.14em |
 | rail label (`.k`, `.fk`, `th`) | 9–9.5px | mono, uppercase | 0.14–0.16em |
-| body / deck | 14–15.5px | sans | normal |
+| body | 14px | sans | normal |
 | data | 11–13px | mono | normal |
 
 The jump from 9.5px rails to 27px hero numbers is deliberate: Swiss hierarchy

@@ -125,45 +125,32 @@
   function renderProof(data) {
     var v = data.verification;
     var facts = [];
-    var cls, seal, claim, sub;
+    var cls, seal, claim;
 
     if (!v) {
-      cls = "warn"; seal = "!";
-      claim = "Equivalence not checked";
-      sub = "run with --verify to compare against the reference simulator";
+      cls = "warn"; seal = "○"; claim = "not checked";
     } else if (v.equivalent) {
-      cls = "ok"; seal = "✓";
-      claim = "U_out ≡ U_in";
-      sub = "every gate run matched the reference simulator, segment by segment";
+      cls = "ok"; seal = "✓"; claim = "U_out ≡ U_in";
       facts.push(fact("max error", v.max_error.toExponential(2)));
       facts.push(fact("segments", v.segments_checked));
       facts.push(fact("simulator", v.backend));
     } else if (!v.available) {
-      cls = "warn"; seal = "!";
-      claim = "Equivalence check skipped";
-      sub = (v.messages || []).join("; ") || "the checker could not run";
+      cls = "warn"; seal = "○";
+      claim = (v.messages || []).join("; ") || "check unavailable";
     } else {
       cls = "fail"; seal = "✗";
-      claim = "Not equivalent";
-      sub = (v.messages || []).join("; ");
+      claim = "U_out ≠ U_in — " + (v.messages || []).join("; ");
     }
     if (data.global_phase) {
       facts.push(fact("global phase", data.global_phase.toFixed(6) + " rad"));
     }
     if (data.llvm && data.llvm.checked) {
-      facts.push(fact("llvm verifier", data.llvm.diagnostic ? "failed" : "passed"));
+      facts.push(fact("llvm", data.llvm.diagnostic ? "failed" : "passed"));
     }
-
-    var badge = document.getElementById("verdict");
-    badge.hidden = false;
-    badge.className = "verdict " + cls;
-    badge.textContent = cls === "ok" ? "verified" : cls === "fail" ? "mismatch" : "unchecked";
 
     return el("div", { class: "proof " + cls },
       el("span", { class: "seal", text: seal }),
-      el("span", { class: "claim" },
-        el("b", { text: claim }),
-        el("span", { text: sub })),
+      el("span", { class: "claim", text: claim }),
       el("div", { class: "facts" }, facts));
   }
 
@@ -203,7 +190,7 @@
 
   function renderMetrics(data) {
     var b = data.metrics.before, a = data.metrics.after;
-    var node = cell("Circuit metrics", "before → after", 5);
+    var node = cell("Circuit metrics", null, 5);
     node.appendChild(rows([
       ["instructions", b.quantum_instructions, a.quantum_instructions],
       ["gates", b.gates, a.gates],
@@ -223,7 +210,7 @@
     var names = Object.keys(b).concat(Object.keys(a)).filter(function (v, i, arr) {
       return arr.indexOf(v) === i;
     }).sort();
-    var node = cell("Gates by kind", names.length + " kinds", 6);
+    var node = cell("Gates by kind", null, 6);
     if (!names.length) {
       node.appendChild(el("p", { class: "void", text: "no quantum instructions" }));
       return node;
@@ -375,7 +362,7 @@
   }
 
   function renderCircuit(data) {
-    var node = cell("Circuit", "hover a gate for its QIR instruction");
+    var node = cell("Circuit");
     [["Before", false, data.circuit.before], ["After −O" + data.level, true, data.circuit.after]]
       .forEach(function (pair) {
         pair[2].blocks.forEach(function (block) {
@@ -450,7 +437,7 @@
 
   function renderDiff(data) {
     var changed = data.diff.filter(function (row) { return row.kind !== " "; }).length;
-    var node = cell("QIR diff", changed + " changed lines · the rest is byte-identical");
+    var node = cell("QIR diff", changed + " changed lines");
     node.appendChild(el("div", { class: "diff" }, data.diff.map(function (row) {
       var cls = row.kind === "+" ? "add" : row.kind === "-" ? "del" : "ctx";
       return el("div", { class: cls, text: row.kind + " " + row.text });
