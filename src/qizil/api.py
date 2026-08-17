@@ -142,6 +142,7 @@ def optimize(
     max_iterations: int | None = None,
     verify: bool = False,
     llvm_check: bool = False,
+    time_budget_s: float | None = None,
 ) -> OptimizationResult:
     """Optimize a QIR module.
 
@@ -155,6 +156,17 @@ def optimize(
         preserve_global_phase: refuse rewrites that change the global phase.
         verify: check unitary equivalence against the input (needs numpy).
         llvm_check: run the output through LLVM's verifier (needs PyQIR).
+        time_budget_s: stop the *optimization pipeline* early past this many
+            seconds instead of running it to a fixed point.  Scoped to the
+            pipeline specifically, not the whole call: parsing and (if
+            requested) verification happen outside it and are bounded
+            separately, by input size and by the reference simulator's own
+            qubit-count ceiling respectively, not by wall-clock time.  Every
+            individual rewrite already preserves the unitary on its own, so
+            a time-limited run can only ever be less optimized, never
+            incorrect -- ``result.pipeline`` reports where it stopped, and
+            ``result.pipeline.total_rewrites`` is unaffected either way.
+            ``None`` (the default) means no limit.
     """
     text = read_source(source)
     module = parse_ll(text)
@@ -177,7 +189,9 @@ def optimize(
         if max_iterations is not None
         else MAX_ITERATIONS.get(level, 8) if passes is None else 8
     )
-    report = PassManager(pipeline, max_iterations=iterations).run(module, ctx)
+    report = PassManager(pipeline, max_iterations=iterations).run(
+        module, ctx, time_budget_s=time_budget_s
+    )
     after = measure(module)
 
     result = OptimizationResult(

@@ -192,6 +192,19 @@ def verify_equivalence(
                     result.messages.append(
                         f"@{name}/{block_a.label}: unitary differs (error {error:.3e})"
                     )
+    if result.ok and result.checked_segments == 0 and result.skipped_segments > 0:
+        # Every segment that existed was skipped (too many qubits, or too
+        # large to check in reasonable time) -- there is zero actual
+        # evidence for equivalence here, so this must not report `ok=True`.
+        # (A module with no quantum content at all also has
+        # checked_segments == 0, but skipped_segments == 0 too in that
+        # case, and vacuous equivalence there is correct to report.)
+        result.ok = False
+        result.available = False
+        result.messages.append(
+            "no segment could be checked -- every segment was skipped "
+            "(see messages above), so equivalence is unverified, not confirmed"
+        )
     result.global_phase = _wrap(total_phase)
     return result
 

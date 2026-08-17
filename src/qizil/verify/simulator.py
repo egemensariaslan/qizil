@@ -24,6 +24,12 @@ __all__ = ["MAX_QUBITS", "unitary_of_segment", "compare", "name"]
 #: Above this the pure-Python path gets slow enough to be a bad experience.
 MAX_QUBITS = 8
 
+#: Coarse guard against a segment within MAX_QUBITS but with enough un-fused
+#: gates to still take an unreasonable amount of wall-clock time in a pure
+#: Python interpreter loop. Calibrated with a safety margin below the
+#: ~1.9e-4 ms/unit measured for dim^2 * gate_count at 8 qubits.
+_MAX_COST_UNITS = 70_000_000  # dim^2 * num_gates
+
 name = "python"
 
 
@@ -75,6 +81,14 @@ def unitary_of_segment(
             "dependency-free simulator (install numpy for up to 12)"
         )
     dim = 1 << num_qubits
+    cost = dim * dim * max(1, len(ops))
+    if cost > _MAX_COST_UNITS:
+        raise Unsupported(
+            f"segment too large to verify in reasonable time without numpy "
+            f"({len(ops)} gates at {num_qubits} qubits) -- this is a coarse "
+            f"heuristic, not a hard correctness limit; install numpy for a "
+            f"higher ceiling"
+        )
     columns = [[1j * 0 if i != j else 1 + 0j for i in range(dim)] for j in range(dim)]
     for op in ops:
         matrix = gate_matrix(op)

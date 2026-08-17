@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
@@ -39,6 +40,17 @@ class PassContext:
     policy: SynthesisPolicy
     tol: float = 1e-9
     max_iterations: int = 8
+    #: Absolute ``time.monotonic()`` deadline, or ``None`` for unlimited.
+    #: Checked between whole passes (PassManager) and periodically inside a
+    #: pass's own search loop (PairPass), so a pathological or adversarial
+    #: circuit degrades to "stops early with a truncated-but-still-correct
+    #: result" instead of hanging.  Every individual rewrite already
+    #: preserves the unitary on its own, so stopping mid-pipeline can only
+    #: ever leave the module under-optimized -- never wrong.
+    deadline: float | None = None
+
+    def out_of_time(self) -> bool:
+        return self.deadline is not None and time.monotonic() >= self.deadline
 
 
 @dataclass
@@ -184,19 +196,31 @@ def _shares(a: QuantumOp, b: QuantumOp) -> bool:
 
 
 def forward_candidates(
-    block: BasicBlock, i: int, through_commuting: bool
+    block: BasicBlock,
+    i: int,
+    through_commuting: bool,
+    deadline: float | None = None,
 ) -> Iterator[int]:
     """Yield indices of gates that could be paired with the gate at ``i``.
 
     In adjacency mode only the immediate DAG successor on a shared qubit is a
     candidate.  With ``through_commuting`` the walk continues past every gate
     that commutes with the one at ``i`` — those can be slid out of the way, so
-    the pair really is adjacent in the reordered circuit.
+    the pair really is adjacent in the reordered circuit.  That walk has no
+    other stopping condition, so on a circuit with many qubits and little
+    overlap between gates it can run the full length of the block (see
+    docs/BENCHMARKS.md); passing ``deadline`` (an absolute
+    ``time.monotonic()`` timestamp) lets a single call bail out mid-scan
+    instead of being the one long step a coarser, only-between-calls check
+    would miss.  Stopping mid-scan is always safe: it just means some
+    candidates go unchecked, never that a wrong one gets yielded.
     """
     op = block.instructions[i].op
     if op is None:
         return
-    for j in range(i + 1, len(block.instructions)):
+    for step, j in enumerate(range(i + 1, len(block.instructions))):
+        if deadline is not None and step % 32 == 0 and time.monotonic() >= deadline:
+            return
         other = block.instructions[j]
         if other.kind in (InstKind.CLASSICAL, InstKind.TRIVIA):
             continue
@@ -226,9 +250,24 @@ class PairPass(Pass):
     ) -> Rewrite | None:  # pragma: no cover - overridden
         raise NotImplementedError
 
+    #: How many loop iterations between deadline checks.  Deliberately small:
+    #: the exact regime this budget exists to bound (many qubits, sparse
+    #: overlap -- see docs/BENCHMARKS.md) is one where a *single* iteration's
+    #: forward_candidates scan can itself cost O(n), so checking only every
+    #: few hundred iterations lets the deadline overshoot by however long
+    #: those iterations take, not just by the check's own overhead. A 32-step
+    #: interval bounds that overshoot tightly while keeping the
+    #: time.monotonic() cost negligible in the fast/common case.
+    _DEADLINE_CHECK_EVERY = 32
+
     def run(self, module: Module, ctx: PassContext) -> PassStats:
         stats = PassStats(self.name)
         for _fn, block in module.blocks():
+            if ctx.out_of_time():
+                stats.notes.append(
+                    f"{self.name}: stopped before this block -- time budget exceeded"
+                )
+                break
             self._run_block(module, block, ctx, stats)
         return stats
 
@@ -236,13 +275,24 @@ class PairPass(Pass):
         self, module: Module, block: BasicBlock, ctx: PassContext, stats: PassStats
     ) -> None:
         i = 0
+        steps = 0
         while i < len(block.instructions):
+            steps += 1
+            if steps % self._DEADLINE_CHECK_EVERY == 0 and ctx.out_of_time():
+                stats.notes.append(
+                    f"{self.name}: stopped mid-block -- time budget exceeded "
+                    f"(this rewrite pass may be under-applied; the module up to "
+                    f"this point is still fully verified-correct)"
+                )
+                return
             inst = block.instructions[i]
             if inst.kind is not InstKind.QUANTUM or inst.op is None or not inst.op.is_gate:
                 i += 1
                 continue
             applied = False
-            for j in forward_candidates(block, i, self.through_commuting):
+            for j in forward_candidates(
+                block, i, self.through_commuting, deadline=ctx.deadline
+            ):
                 other = block.instructions[j]
                 if other.op is None or not other.op.is_gate:
                     continue

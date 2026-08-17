@@ -58,6 +58,14 @@ def _diff(before: str, after: str, limit: int = 4000) -> list[dict]:
     return rows
 
 
+#: Default pipeline time budget for the browser UI and standalone report --
+#: the network-facing / untrusted-input surface. A generous ceiling: it
+#: exists to guarantee a request eventually returns (with an honestly
+#: reported, still fully correct, partial result -- see
+#: qizil.api.optimize's time_budget_s), not to constrain everyday use.
+DEFAULT_TIME_BUDGET_S = 25.0
+
+
 def build(
     source: str,
     name: str = "<pasted>",
@@ -67,6 +75,7 @@ def build(
     verify: bool = True,
     error_budget: float = 1e-3,
     qubit_params: str = "qubit_gate_ns_e3",
+    time_budget_s: float | None = DEFAULT_TIME_BUDGET_S,
 ) -> dict:
     """Optimize ``source`` and package the whole story for a renderer.
 
@@ -95,6 +104,7 @@ def build(
         preserve_global_phase=preserve_global_phase,
         verify=verify,
         llvm_check=have_pyqir(),
+        time_budget_s=time_budget_s,
     )
 
     estimates = compare(

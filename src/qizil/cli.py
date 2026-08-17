@@ -104,6 +104,7 @@ def cmd_optimize(args: argparse.Namespace) -> int:
         max_iterations=args.max_iterations,
         verify=args.verify,
         llvm_check=args.llvm_check,
+        time_budget_s=args.time_budget,
     )
 
     if args.json:
@@ -463,6 +464,15 @@ def build_parser() -> argparse.ArgumentParser:
     opt.add_argument("--disable", help="comma-separated passes to skip")
     opt.add_argument(
         "--max-iterations", type=int, help="cap pipeline repetitions"
+    )
+    opt.add_argument(
+        "--time-budget",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help="stop the optimization pipeline early past this many seconds "
+        "(a truncated run is always still fully correct, just less "
+        "optimized; unset means no limit)",
     )
     opt.add_argument(
         "--tolerance", type=float, default=1e-9, help="angle comparison tolerance"

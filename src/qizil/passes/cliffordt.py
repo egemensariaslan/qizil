@@ -66,6 +66,11 @@ class CliffordTPass(Pass):
             if guard > limit:  # pragma: no cover - defensive only
                 stats.notes.append("fold iteration guard tripped")
                 break
+            if guard % 32 == 0 and ctx.out_of_time():
+                stats.notes.append(
+                    f"{self.name}: stopped mid-block -- time budget exceeded"
+                )
+                break
 
             inst = block.instructions[i]
             if inst.kind is not InstKind.QUANTUM or inst.op is None:

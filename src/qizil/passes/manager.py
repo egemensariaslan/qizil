@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 
 from ..ir.module import Module
@@ -83,11 +84,29 @@ class PassManager:
         self.passes = passes
         self.max_iterations = max_iterations
 
-    def run(self, module: Module, ctx: PassContext) -> PipelineReport:
+    def run(
+        self, module: Module, ctx: PassContext, time_budget_s: float | None = None
+    ) -> PipelineReport:
+        """Run the pipeline to a fixed point, or until ``time_budget_s`` runs out.
+
+        A time-limited run is never wrong, only potentially less optimized:
+        every individual rewrite already preserves the unitary on its own
+        (that is the whole premise this project verifies), so stopping the
+        pipeline early can only leave gates un-fused, never produce an
+        incorrect module.  See ``PassContext.deadline`` / ``PairPass``.
+        """
+        if time_budget_s is not None:
+            ctx.deadline = time.monotonic() + time_budget_s
         report = PipelineReport()
         for stage in self.passes:
             report.per_pass.setdefault(stage.name, PassStats(stage.name))
         for _ in range(self.max_iterations):
+            if ctx.out_of_time():
+                if self.passes:
+                    report.per_pass[self.passes[0].name].notes.append(
+                        "pipeline: stopped before this iteration -- time budget exceeded"
+                    )
+                break
             report.iterations += 1
             changed = False
             for stage in self.passes:

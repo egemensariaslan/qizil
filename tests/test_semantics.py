@@ -132,6 +132,33 @@ def test_qft_then_inverse_qft_collapses_to_the_identity():
     assert result.global_phase == 0.0, "this construction carries no global phase"
 
 
+def test_verifier_never_claims_ok_with_zero_evidence():
+    """A module where every segment gets skipped (too large, too many
+    qubits) must not report ok=True: that would claim "verified equivalent"
+    on the strength of literally nothing having been checked. Distinct from
+    a module with no quantum content at all, which legitimately has nothing
+    to check and should still report ok=True (see the segment-count-1 case
+    below, from the single trivial dim=2 comparison an empty module still
+    produces)."""
+    import random
+
+    from qizil.verify import verify_equivalence
+
+    rng = random.Random(8)
+    gates = random_gates(rng, 400, 20)  # small enough to build fast, still
+    ir = make_ir(gates, 20)             # unverifiable: 20 qubits > any MAX_QUBITS
+    original = parse_ll(ir)
+    optimized = parse_ll(ir)  # identical -- if anything were checked, it'd pass
+    result = verify_equivalence(original, optimized)
+
+    assert result.checked_segments == 0
+    assert result.skipped_segments > 0
+    assert result.available is False
+    assert result.ok is False, (
+        "reported ok=True with zero segments actually checked"
+    )
+
+
 def test_verifier_catches_a_deliberately_wrong_rewrite():
     original = parse_ll(make_ir([("t", "body", None, [0])] * 2, 1))
     broken = parse_ll(make_ir([("t", "body", None, [0])], 1))

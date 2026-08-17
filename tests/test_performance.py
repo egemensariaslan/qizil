@@ -69,3 +69,90 @@ def test_time_grows_no_worse_than_roughly_linear():
         f"5x more gates took {ratio:.1f}x longer ({small_time*1000:.0f}ms -> "
         f"{large_time*1000:.0f}ms) — looks superlinear again"
     )
+
+
+# --------------------------------------------------------------------------
+# time_budget_s: the pipeline must terminate, and stay correct, on schedule
+# --------------------------------------------------------------------------
+
+
+def _adversarial_timing_ir():
+    """Many qubits, sparse overlap: the regime that makes the ``commute``
+    pass's forward scan run long (see docs/BENCHMARKS.md). Too many qubits
+    to run through the reference simulator -- use only for timing."""
+    rng = random.Random(7)
+    gates = random_gates(rng, 4000, 250)
+    return make_ir(gates, 250)
+
+
+def _adversarial_verifiable_ir():
+    """The same sparse-overlap regime, small enough (qubits and gate count)
+    to stay inside the reference simulator's practical range so truncated
+    output can still be independently re-verified end to end. Dense unitary
+    verification is inherently O(dim^2) per gate at best (see
+    docs/BENCHMARKS.md) -- this is sized to actually finish, not to stress
+    the pipeline's own timing."""
+    rng = random.Random(8)
+    gates = random_gates(rng, 150, 8)
+    return make_ir(gates, 8)
+
+
+def test_time_budget_bounds_wall_clock_on_an_adversarial_circuit():
+    ir = _adversarial_timing_ir()
+
+    t0 = time.perf_counter()
+    optimize(ir, level=3, time_budget_s=1.0)
+    elapsed = time.perf_counter() - t0
+
+    # Generous multiplier: parsing this large a module happens outside the
+    # budgeted region (see qizil.api.optimize's time_budget_s docstring), so
+    # this bounds the whole call, not just the pipeline it directly limits.
+    assert elapsed < 5.0, f"took {elapsed:.2f}s with a 1.0s pipeline budget"
+
+
+def test_time_budget_result_is_still_fully_correct():
+    """A truncated pipeline must never be wrong -- only less optimized."""
+    from qizil.verify import verify_equivalence
+
+    ir = _adversarial_verifiable_ir()
+    full = optimize(ir, level=3)
+    truncated = optimize(ir, level=3, time_budget_s=0.01)
+
+    assert truncated.after.gates >= full.after.gates, (
+        "a time-limited run should never out-optimize the untimed run"
+    )
+    # Whatever qizil actually produced, however much it got done, must still
+    # be exactly equivalent to the input -- re-verify from scratch rather
+    # than trust the truncated run's own bookkeeping.
+    check = verify_equivalence(truncated.original, truncated.module)
+    assert check.available, check.messages
+    assert check.ok, check.messages
+
+
+def test_time_budget_reports_where_it_stopped():
+    ir = _adversarial_timing_ir()
+    result = optimize(ir, level=3, time_budget_s=0.05)
+    notes = [n for s in result.pipeline.per_pass.values() for n in s.notes]
+    assert any("time budget" in n for n in notes)
+
+
+def test_no_time_budget_means_no_limit():
+    """The default must reproduce the exact pre-existing behavior."""
+    ir = make_ir(random_gates(random.Random(3), 400, 8), 8)
+    default = optimize(ir, level=3)
+    explicit_none = optimize(ir, level=3, time_budget_s=None)
+    assert default.to_ll() == explicit_none.to_ll()
+
+
+def test_generous_time_budget_does_not_truncate_a_normal_circuit():
+    ir = make_ir(random_gates(random.Random(4), 500, 8), 8)
+    unbounded = optimize(ir, level=3)
+    generously_bounded = optimize(ir, level=3, time_budget_s=30.0)
+    assert unbounded.to_ll() == generously_bounded.to_ll()
+    notes = [
+        n
+        for s in generously_bounded.pipeline.per_pass.values()
+        for n in s.notes
+        if "time budget" in n
+    ]
+    assert notes == []
