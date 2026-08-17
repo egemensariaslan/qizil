@@ -39,26 +39,45 @@ class CliffordTPass(Pass):
     def run(self, module: Module, ctx: PassContext) -> PassStats:
         stats = PassStats(self.name)
         for _fn, block in module.blocks():
-            guard = 0
-            while self._fold_one(module, block, ctx, stats):
-                guard += 1
-                if guard > 4 * len(block.instructions) + 16:  # pragma: no cover
-                    stats.notes.append("fold iteration guard tripped")
-                    break
+            self._sweep_block(module, block, ctx, stats)
         return stats
 
-    # -- one rewrite ----------------------------------------------------
-    def _fold_one(
+    # -- one left-to-right sweep -----------------------------------------
+    def _sweep_block(
         self, module: Module, block: BasicBlock, ctx: PassContext, stats: PassStats
-    ) -> bool:
-        for i, inst in enumerate(block.instructions):
+    ) -> None:
+        """Fold every same-axis run in one forward pass.
+
+        ``_gather`` already returns the *maximal* run reachable from its
+        starting index, so folding it can only ever change instructions at
+        or after that index — nothing earlier can become newly foldable.
+        That makes a single left-to-right sweep, resuming right where each
+        fold left off, a complete fixed point for this pass alone: no need
+        to rescan from the top after every rewrite (the old approach, which
+        made this pass quadratic in the number of rewrites for long blocks).
+        Interactions with *other* passes are still handled by the pipeline's
+        own outer fixed-point loop in :class:`~qizil.passes.manager.PassManager`.
+        """
+        i = 0
+        guard = 0
+        limit = 4 * len(block.instructions) + 16
+        while i < len(block.instructions):
+            guard += 1
+            if guard > limit:  # pragma: no cover - defensive only
+                stats.notes.append("fold iteration guard tripped")
+                break
+
+            inst = block.instructions[i]
             if inst.kind is not InstKind.QUANTUM or inst.op is None:
+                i += 1
                 continue
             form = axis_form(inst.op)
             if form is None:
+                i += 1
                 continue
             qubit = inst.op.qubits[0]
             if not qubit.is_definite():
+                i += 1
                 continue
 
             members = self._gather(block, i, qubit, form.axis)
@@ -66,14 +85,15 @@ class CliffordTPass(Pass):
             angle, phase = fold(forms)
             emission = synthesize_axis(form.axis, angle, phase, ctx.policy)
             if emission is None:
+                i += 1
                 continue
             original = [_signature(block.instructions[m].op) for m in members]
             if _same(original, list(emission.gates), ctx.tol):
+                i += 1
                 continue
 
             self._apply(module, block, members, emission, qubit, stats)
-            return True
-        return False
+            i = members[0]  # re-examine from here; nothing before it changed
 
     def _gather(
         self, block: BasicBlock, start: int, qubit, axis: str
