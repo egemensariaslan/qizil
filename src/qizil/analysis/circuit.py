@@ -74,6 +74,12 @@ class CircuitBlock:
     function: str
     label: str | None
     ops: list[dict] = field(default_factory=list)
+    #: Width of the greedy visual layout, in gate-columns.  A rendering
+    #: artifact, not the circuit-theoretic depth reported by
+    #: ``qizil.analysis.metrics.Metrics.depth`` (the DAG's longest
+    #: dependency chain): a long-range 2-qubit gate reserves every column it
+    #: visually spans, even on wires it does not touch, so this number can
+    #: run higher than the true depth.  Never label it "depth" in the UI.
     columns: int = 0
 
     def to_dict(self) -> dict:

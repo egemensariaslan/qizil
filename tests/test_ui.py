@@ -214,6 +214,38 @@ def test_server_reports_a_bad_module(server):
     assert excinfo.value.code == 400
 
 
+def test_server_never_reads_source_as_a_filesystem_path(server, tmp_path):
+    """``source`` must always be treated as literal QIR text.
+
+    A network-facing handler that let a client's string be interpreted as a
+    path to open on the server's disk would be a local-file-read primitive.
+    qizil.api.optimize has a path-sniffing heuristic for CLI convenience
+    (`qizil circuit.ll`); payload.build must never let that heuristic run on
+    text that arrived over HTTP. This asserts a real, readable file's path,
+    given as ``source``, is rejected as non-QIR text rather than having its
+    contents echoed back.
+    """
+    secret = tmp_path / "secret.txt"
+    secret.write_text("super-secret-file-contents\n")
+
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        _post(server + "/api/optimize", {"source": str(secret)})
+    assert excinfo.value.code == 400
+    body = json.loads(excinfo.value.read())
+    assert "super-secret" not in json.dumps(body)
+
+
+def test_server_gives_a_clear_error_for_non_qir_text(server):
+    status, data = None, None
+    try:
+        _post(server + "/api/optimize", {"source": "hello, this is just some text"})
+    except urllib.error.HTTPError as exc:
+        status = exc.code
+        data = json.loads(exc.read())
+    assert status == 400
+    assert "does not look like a QIR module" in data["error"]
+
+
 def test_server_404s_unknown_paths(server):
     with pytest.raises(urllib.error.HTTPError) as excinfo:
         _get(server + "/nope")

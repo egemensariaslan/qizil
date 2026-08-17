@@ -357,7 +357,7 @@
       el("span", { class: "stage-tag" + (isAfter ? " now" : "") },
         label,
         el("em", { text: "@" + block.function + (block.label ? " · " + block.label : "") }),
-        el("em", { text: "depth " + block.columns })),
+        el("em", { text: block.columns + (block.columns === 1 ? " column" : " columns") })),
       el("div", { class: "scroller" }, drawBlock(block, wires)));
   }
 

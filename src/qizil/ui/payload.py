@@ -15,6 +15,7 @@ from ..analysis.circuit import describe
 from ..analysis.estimator import compare, estimate
 from ..api import optimize
 from ..ir.bitcode import have_pyqir
+from ..ir.parser import parse_ll
 
 __all__ = ["build", "list_examples", "EXAMPLES_DIR"]
 
@@ -67,9 +68,28 @@ def build(
     error_budget: float = 1e-3,
     qubit_params: str = "qubit_gate_ns_e3",
 ) -> dict:
-    """Optimize ``source`` and package the whole story for a renderer."""
+    """Optimize ``source`` and package the whole story for a renderer.
+
+    ``source`` is always literal QIR text here, never a filesystem path --
+    every call site (the CLI's ``report`` command, and the HTTP server's
+    pasted/uploaded module) has already resolved any file on disk into text
+    before reaching this function.  Parsing it directly, instead of handing
+    the raw string to :func:`qizil.api.optimize`, is deliberate: that
+    function's own path-sniffing heuristic (a single line with no IR syntax
+    looks like a filename) exists for CLI convenience and has no business
+    running on a string that arrived over the ``qizil ui`` HTTP API --
+    without this, a client could set ``source`` to an arbitrary filesystem
+    path (``~/.ssh/id_rsa``, ``/etc/passwd``) and the server would try to
+    read it off disk.
+    """
+    module = parse_ll(source)
+    if not module.functions:
+        raise ValueError(
+            "no function definitions found -- this does not look like a QIR "
+            "module (expected at least one `define ... { ... }`)"
+        )
     result = optimize(
-        source,
+        module,
         level=level,
         gateset=gateset,
         preserve_global_phase=preserve_global_phase,

@@ -99,6 +99,7 @@ def test_output_passes_the_llvm_verifier(seed):
         "adaptive_branch.ll",
         "dynamic_qubits.ll",
         "trotter_step.ll",
+        "qft_roundtrip.ll",
     ],
 )
 def test_shipped_examples_verify(name, level):
@@ -111,6 +112,24 @@ def test_shipped_examples_verify(name, level):
     result = optimize(text, level=level, verify=True)
     assert result.verification.ok, result.verification.messages
     assert _phase_close(result.global_phase, result.verification.global_phase)
+
+
+def test_qft_then_inverse_qft_collapses_to_the_identity():
+    """QFT_n . QFT_n^-1 = I is known in closed form -- not a claim about the
+    optimizer, a claim about the mathematics -- so this is the strongest
+    correctness check in the suite: it fails if the algebra is wrong, not
+    just if it regresses.
+    """
+    import os
+
+    from conftest import EXAMPLES
+
+    with open(os.path.join(EXAMPLES, "qft_roundtrip.ll"), encoding="utf-8") as fh:
+        text = fh.read()
+    result = optimize(text, level=3, verify=True)
+    assert result.verification.ok, result.verification.messages
+    assert result.after.gates == 0, "QFT . QFT^-1 should optimize away entirely"
+    assert result.global_phase == 0.0, "this construction carries no global phase"
 
 
 def test_verifier_catches_a_deliberately_wrong_rewrite():
