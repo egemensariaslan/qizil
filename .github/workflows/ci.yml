@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (py${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          # The headline promise is "clone and run with the stdlib alone" --
+          # prove it on the minimum supported version, with no extras
+          # installed at all, on every OS we claim to support.
+          - os: ubuntu-latest
+            python-version: "3.10"
+            bare: true
+          - os: windows-latest
+            python-version: "3.12"
+            bare: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install (core + dev extras)
+        if: ${{ !matrix.bare }}
+        run: pip install -e ".[dev]"
+
+      - name: Install (core only -- no numpy, no pyqir)
+        if: matrix.bare
+        run: pip install -e . && pip install pytest
+
+      - name: Run the test suite
+        run: pytest -q
+
+      - name: ./qizil works with zero dependencies installed (Unix)
+        if: matrix.bare
+        run: |
+          python3 -c "import numpy" 2>/dev/null && { echo "numpy leaked into the bare env"; exit 1; } || true
+          ./qizil examples/trotter_step.ll -O3 -o /tmp/out.ll --verify
+          test -s /tmp/out.ll
+
+      - name: qizil works from a clean install (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          qizil examples/trotter_step.ll -O3 -o out.ll --verify
+          if (-not (Test-Path out.ll)) { exit 1 }
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: ruff check
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check src/ tests/ examples/"
+
+  build:
+    name: package builds and installs clean
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - name: install the built wheel into a fresh venv and smoke-test it
+        run: |
+          python -m venv /tmp/wheeltest
+          /tmp/wheeltest/bin/pip install dist/*.whl
+          /tmp/wheeltest/bin/qizil --version
+          /tmp/wheeltest/bin/qizil examples/bell_redundant.ll -O2 -o /tmp/out.ll --quiet
+          test -s /tmp/out.ll
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
