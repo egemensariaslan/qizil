@@ -1,10 +1,11 @@
 # Changelog
 
 All notable changes to Qizil are documented here. Format loosely follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project has
-not yet made a tagged release, so everything so far is under `[Unreleased]`.
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Nothing has been
+published to PyPI yet; version numbers here track `pyproject.toml` and the
+local git history.
 
-## [Unreleased]
+## [0.2.0]
 
 ### Added
 

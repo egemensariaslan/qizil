@@ -9,7 +9,7 @@ from .api import OptimizationResult, optimize, parse, read_source
 from .ir import Module, ParseError, parse_file, parse_ll
 from .passes import PASS_REGISTRY, PIPELINES, PassManager, build_pipeline
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "__version__",
