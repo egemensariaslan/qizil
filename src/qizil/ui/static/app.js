@@ -473,6 +473,29 @@
       "  ·  resource model after arXiv:2211.07629" +
       "  ·  equivalence checked with the " +
       ((data.verification && data.verification.backend) || "reference") + " simulator";
+
+    announce(summarize(data));
+  }
+
+  function summarize(data) {
+    var v = data.verification;
+    var verdict = !v
+      ? "equivalence not checked"
+      : v.equivalent
+        ? "verified equivalent"
+        : v.available
+          ? "NOT equivalent"
+          : "equivalence unavailable";
+    var b = data.metrics.before, a = data.metrics.after;
+    return (
+      "Optimization complete at level " + data.level + ". " + verdict + ". " +
+      "Gates reduced from " + b.gates + " to " + a.gates + "."
+    );
+  }
+
+  function announce(message) {
+    var region = document.getElementById("announce");
+    if (region) region.textContent = message;
   }
 
   function fail(message) {
@@ -538,14 +561,18 @@
   function buildLevels() {
     var box = document.getElementById("level");
     [0, 1, 2, 3].forEach(function (level) {
+      // role="radio" + aria-checked, not aria-pressed: these four buttons
+      // are mutually exclusive, matching the radiogroup role already on
+      // their container (see index.html) -- a toggle-button pattern here
+      // would tell assistive tech something different from what's true.
       var button = el("button", {
-        type: "button", text: "−O" + level,
-        "aria-pressed": String(level === state.level)
+        type: "button", text: "−O" + level, role: "radio",
+        "aria-checked": String(level === state.level)
       });
       button.addEventListener("click", function () {
         state.level = level;
         Array.prototype.forEach.call(box.children, function (child) {
-          child.setAttribute("aria-pressed", String(child === button));
+          child.setAttribute("aria-checked", String(child === button));
         });
         run();
       });
