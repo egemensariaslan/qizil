@@ -1,5 +1,7 @@
 # Qizil — QIR-Opt
 
+[![CI](https://github.com/egemen/qizil/actions/workflows/ci.yml/badge.svg)](https://github.com/egemen/qizil/actions/workflows/ci.yml)
+
 A compiler optimization module for **QIR** (Quantum Intermediate Representation).
 Qizil reads QIR as `.ll` or `.bc`, builds a quantum instruction DAG, applies
 peephole cancellation, rotation fusion, commutation-based reordering and
@@ -260,9 +262,14 @@ What the passes will **not** touch:
 - every line the passes did not rewrite, which is emitted **byte for byte** —
   `-O0` output is identical to the input.
 
-The test suite (369 tests) includes ~250 randomized circuits over 2–4 qubits
-checked against a reference simulator at every optimization level, plus the
-same check on the tracked global phase.
+The test suite (484 tests, CI-checked on Python 3.10-3.13, Linux/macOS/Windows,
+with *and* without numpy/PyQIR installed) includes ~300 randomized circuits
+checked against two independent reference simulator implementations at every
+optimization level. See [`docs/VALIDATION.md`](docs/VALIDATION.md) for the
+full methodology, and [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) for measured
+performance numbers, including two real defects found and fixed while
+building this (a cubic blowup in one pass, a cubic-vs-quadratic verifier
+bug) with the before/after data to show it.
 
 ## Results on the shipped examples
 
@@ -275,11 +282,18 @@ same check on the tracked global phase.
 | `adaptive_branch.ll` | 17 → 6 | 14 → 3 | 17 → 6 | 4 → 0 | 2 → 0 |
 | `dynamic_qubits.ll` | 9 → 5 | 8 → 4 | 11 → 8 | 2 → 1 | 2 → 0 |
 | `trotter_step.ll` | 104 → 76 | 100 → 72 | 53 → 44 | 0 → 0 | 44 → 34 |
+| `qft_roundtrip.ll` | 99 → 5 | 94 → 0 | 55 → 1 | 0 → 0 | 24 → 0 |
 
-All five verify as equivalent and pass LLVM's module verifier.
+All six verify as equivalent and pass LLVM's module verifier.
 `trotter_step.ll` is four symmetric Trotter steps of a 4-spin transverse-field
 Ising chain (`examples/gen_trotter.py`); the estimator reports −23% T states and
-−22% runtime for it.
+−22% runtime for it. `qft_roundtrip.ll` is a 5-qubit Quantum Fourier Transform
+immediately followed by its own exact inverse
+(`examples/gen_qft.py`) — mathematically the identity, `QFT · QFT⁻¹ = I`, a
+fact independent of this tool. Every gate collapses: 94 → 0, depth 55 → 1,
+verified to 1.4e-15 with zero global phase — see
+[`docs/VALIDATION.md`](docs/VALIDATION.md#layer-3--a-closed-form-ground-truth-not-a-self-reported-one)
+for why this is the strongest correctness demonstration in the project.
 
 ## Resource estimation
 
@@ -355,6 +369,16 @@ Known, deliberate, and each one fails safe (the code is left alone):
 - the equivalence checker is a dense simulator: 8 qubits on the dependency-free
   backend, 12 with numpy installed;
 - multi-line LLVM instructions are handled for bracketed forms (`switch`) only.
+
+## Documentation
+
+| doc | what's in it |
+| --- | --- |
+| [`docs/VALIDATION.md`](docs/VALIDATION.md) | the correctness methodology: what's proven, how, and what explicitly is not |
+| [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) | measured performance, including two real defects found and fixed with before/after data |
+| [`docs/design.md`](docs/design.md) | why the codebase is built the way it is — qubit aliasing, barriers, the DAG, the normal form |
+| [`docs/design-system.md`](docs/design-system.md) | the UI's visual language and how to extend it |
+| [`docs/extending.md`](docs/extending.md) | adding a gate, a pass, or running the test suite |
 
 ## License
 
