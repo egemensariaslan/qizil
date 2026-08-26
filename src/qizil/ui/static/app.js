@@ -82,7 +82,6 @@
       style: "animation-delay:" + Math.min(order * 45, 320) + "ms"
     },
       el("header", { class: "cell-head" },
-        el("span", { class: "idx", text: ("0" + order).slice(-2) }),
         el("h2", { text: title }),
         meta ? el("span", { class: "meta", text: meta }) : null));
     return node;
@@ -154,44 +153,32 @@
       el("div", { class: "facts" }, facts));
   }
 
-  // ------------------------------------------------------------------ bars
+  // ---------------------------------------------------------------- tables
 
-  var pending = [];
-
-  function bars(before, after) {
-    var scale = Math.max(before, after, 1);
-    function line(kind, value) {
-      var fill = el("span", { class: "fill" });
-      pending.push([fill, (value / scale) * 100]);
-      return el("div", { class: "bar " + kind },
-        el("span", { class: "track" }, fill),
-        el("span", { class: "n", text: num(value) }));
-    }
-    return el("div", { class: "rb" }, line("a", before), line("b", after));
-  }
-
-  function flushBars() {
-    var queued = pending;
-    pending = [];
-    requestAnimationFrame(function () {
-      queued.forEach(function (entry) { entry[0].style.width = entry[1] + "%"; });
-    });
-  }
-
-  function rows(list) {
-    return el("div", { class: "rows" }, list.map(function (row) {
-      var d = delta(row[1], row[2]);
-      return el("div", { class: "row" },
-        el("span", { class: "rk", text: row[0] }),
-        bars(row[1], row[2]),
-        el("span", { class: "chg " + d.cls, text: d.text }));
-    }));
+  /** A compact before/after/delta comparison table -- one line per metric,
+   * no repeated bar chrome. `headers` defaults to before/after/delta. */
+  function metricTable(list, headers) {
+    headers = headers || ["before", "after", "Δ"];
+    return el("table", null,
+      el("thead", null, el("tr", null,
+        el("th", { text: "metric" }),
+        el("th", { text: headers[0] }),
+        el("th", { text: headers[1] }),
+        el("th", { text: headers[2] }))),
+      el("tbody", null, list.map(function (row) {
+        var d = delta(row[1], row[2]);
+        return el("tr", null,
+          el("td", { text: row[0] }),
+          el("td", { class: "n", text: num(row[1]) }),
+          el("td", { class: "n", text: num(row[2]) }),
+          el("td", { class: "n chg " + d.cls, text: d.text }));
+      })));
   }
 
   function renderMetrics(data) {
     var b = data.metrics.before, a = data.metrics.after;
     var node = cell("Circuit metrics", null, 5);
-    node.appendChild(rows([
+    node.appendChild(metricTable([
       ["instructions", b.quantum_instructions, a.quantum_instructions],
       ["gates", b.gates, a.gates],
       ["1-qubit", b.one_qubit_gates, a.one_qubit_gates],
@@ -215,7 +202,7 @@
       node.appendChild(el("p", { class: "void", text: "no quantum instructions" }));
       return node;
     }
-    node.appendChild(rows(names.map(function (name) {
+    node.appendChild(metricTable(names.map(function (name) {
       return [name, b[name] || 0, a[name] || 0];
     })));
     return node;
@@ -387,7 +374,7 @@
     var b = data.estimate.before, a = data.estimate.after;
     var node = cell("Fault-tolerant resources",
       "surface code · ε " + b.error_budget + " · " + b.qubit_params, 7);
-    var list = [
+    node.appendChild(metricTable([
       ["algorithmic qubits", b.algorithmic_qubits, a.algorithmic_qubits],
       ["logical qubits", b.logical_qubits, a.logical_qubits],
       ["code distance", b.code_distance, a.code_distance],
@@ -395,19 +382,7 @@
       ["T states", b.t_states, a.t_states],
       ["physical qubits", b.physical_qubits, a.physical_qubits],
       ["runtime (µs)", b.runtime_ns / 1000, a.runtime_ns / 1000]
-    ];
-    node.appendChild(el("table", null,
-      el("thead", null, el("tr", null,
-        el("th", { text: "metric" }), el("th", { text: "before" }),
-        el("th", { text: "after" }), el("th", { text: "Δ" }))),
-      el("tbody", null, list.map(function (row) {
-        var d = delta(row[1], row[2]);
-        return el("tr", null,
-          el("td", { text: row[0] }),
-          el("td", { class: "n", text: num(row[1]) }),
-          el("td", { class: "n", text: num(row[2]) }),
-          el("td", { class: "n chg " + d.cls, text: d.text }));
-      }))));
+    ]));
     (b.model_notes || []).forEach(function (note) {
       node.appendChild(el("p", {
         class: "void", style: "margin:14px 0 0;line-height:1.6", text: note
@@ -418,6 +393,22 @@
 
   // ----------------------------------------------------------------- trace
 
+  /** Consecutive entries from the same pass collapse into one group -- a
+   * pass commonly fires dozens of times in a row (47 "cancel" rewrites is
+   * typical), and repeating a colored badge on every single line reads as
+   * noise rather than a log. Small groups stay open; large ones start
+   * collapsed behind a native <details> disclosure (no extra JS, free
+   * keyboard support). */
+  function groupTrace(rewrites) {
+    var groups = [];
+    rewrites.forEach(function (entry) {
+      var last = groups[groups.length - 1];
+      if (last && last.pass === entry.pass) last.notes.push(entry.note);
+      else groups.push({ pass: entry.pass, notes: [entry.note] });
+    });
+    return groups;
+  }
+
   function renderTrace(data) {
     var node = cell("Rewrite trace",
       data.pipeline.total_rewrites + " rewrites · " + data.pipeline.iterations + " passes", 6);
@@ -425,10 +416,17 @@
       node.appendChild(el("p", { class: "void", text: "nothing to rewrite at this level" }));
       return node;
     }
-    node.appendChild(el("ul", { class: "trace" }, data.rewrites.map(function (entry) {
-      return el("li", null,
-        el("span", { class: "tag " + entry.pass, text: entry.pass }),
-        el("span", { class: "note", text: entry.note }));
+    var groups = groupTrace(data.rewrites);
+    node.appendChild(el("div", { class: "trace" }, groups.map(function (group) {
+      var small = group.notes.length <= 5;
+      return el("details", { class: "trace-group", open: small },
+        el("summary", null,
+          el("i", { class: "dot " + group.pass }),
+          el("span", { class: "pass", text: group.pass }),
+          el("span", { class: "count", text: group.notes.length })),
+        el("ul", null, group.notes.map(function (note) {
+          return el("li", { text: note });
+        })));
     })));
     return node;
   }
@@ -451,7 +449,6 @@
     var app = document.getElementById("app");
     app.textContent = "";
     order = 0;
-    pending = [];
 
     app.appendChild(renderHero(data));
     app.appendChild(renderProof(data));
@@ -461,13 +458,17 @@
     app.appendChild(renderTrace(data));
     app.appendChild(renderHistogram(data));
     app.appendChild(renderDiff(data));
-    flushBars();
 
+    // Reflects only flags actually in effect for this run -- data.verification
+    // is null when verify wasn't requested, not just when it failed, so that
+    // (not the checkbox's live state, which could differ from what actually
+    // ran) is the honest source for whether --verify belongs in this line.
     document.getElementById("cmd").textContent =
       "qizil " + data.name + " -O" + data.level +
       (data.options.gateset === "strict" ? " --gateset strict" : "") +
       (data.options.preserve_global_phase ? " --preserve-global-phase" : "") +
-      " -o optimized.ll --verify";
+      (data.verification !== null ? " --verify" : "") +
+      " -o optimized.ll";
     document.getElementById("footnote").textContent =
       "QIZIL " + (data.version || "") +
       "  ·  resource model after arXiv:2211.07629" +
@@ -601,16 +602,38 @@
     document.getElementById("verify").addEventListener("change", function (e) {
       state.verify = e.target.checked; run();
     });
-    document.getElementById("file").addEventListener("change", function (e) {
-      var file = e.target.files && e.target.files[0];
+    var dropzone = document.querySelector(".dropzone");
+    var filenameLabel = document.getElementById("filename");
+
+    function loadFile(file) {
       if (!file) return;
       var reader = new FileReader();
       reader.onload = function () {
         state.source = String(reader.result);
         state.name = file.name;
+        filenameLabel.textContent = file.name;
         run();
       };
       reader.readAsText(file);
+    }
+
+    document.getElementById("file").addEventListener("change", function (e) {
+      loadFile(e.target.files && e.target.files[0]);
+    });
+    ["dragenter", "dragover"].forEach(function (type) {
+      dropzone.addEventListener(type, function (e) {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+    });
+    ["dragleave", "drop"].forEach(function (type) {
+      dropzone.addEventListener(type, function (e) {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+      });
+    });
+    dropzone.addEventListener("drop", function (e) {
+      loadFile(e.dataTransfer.files && e.dataTransfer.files[0]);
     });
     picker.addEventListener("change", function () {
       var chosen = EXAMPLES[picker.selectedIndex];

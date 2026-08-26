@@ -12,37 +12,48 @@
 
 <header class="masthead">
   <span class="wordmark">QIZIL</span>
-  <code class="command" id="cmd">qizil input.ll -O3 -o optimized.ll --verify</code>
   <button class="ghost" id="theme" type="button" title="Toggle theme">
     <span id="theme-label">LIGHT</span>
   </button>
 </header>
 
-<section class="console" id="controls" hidden>
-  <div class="control">
-    <label for="example">Circuit</label>
-    <select id="example"></select>
+<section class="toolbar" id="controls" hidden>
+  <div class="toolbar-row">
+    <div class="control">
+      <label for="example">Circuit</label>
+      <select id="example"></select>
+    </div>
+    <div class="control">
+      <label for="level">Level</label>
+      <div class="segmented" id="level" role="radiogroup" aria-label="Optimization level"></div>
+    </div>
+    <div class="control">
+      <label for="gateset">Gate set</label>
+      <select id="gateset">
+        <option value="auto">auto</option>
+        <option value="strict">strict</option>
+      </select>
+    </div>
+    <div class="control switches">
+      <label class="switch"><input type="checkbox" id="phase"><span>keep global phase</span></label>
+      <label class="switch"><input type="checkbox" id="verify" checked><span>verify</span></label>
+    </div>
+    <div class="control grow">
+      <span class="control-label">Load module</span>
+      <label class="dropzone" for="file">
+        <svg class="dz-icon" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M8 2v8M8 2l-3 3M8 2l3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2.5 11v1.5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5V11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span class="dz-text" id="filename">Browse or drop a .ll file</span>
+      </label>
+      <input type="file" id="file" accept=".ll,.txt" class="sr-only">
+    </div>
   </div>
-  <div class="control">
-    <label for="level">Level</label>
-    <div class="segmented" id="level" role="radiogroup" aria-label="Optimization level"></div>
+  <div class="toolbar-row toolbar-run">
+    <code class="command" id="cmd">qizil input.ll -O3 --verify</code>
+    <button id="run" class="primary" type="button">Optimize</button>
   </div>
-  <div class="control">
-    <label for="gateset">Gate set</label>
-    <select id="gateset">
-      <option value="auto">auto</option>
-      <option value="strict">strict</option>
-    </select>
-  </div>
-  <div class="control switches">
-    <label class="switch"><input type="checkbox" id="phase"><span>keep global phase</span></label>
-    <label class="switch"><input type="checkbox" id="verify" checked><span>verify</span></label>
-  </div>
-  <div class="control grow">
-    <label for="file">Load module</label>
-    <input type="file" id="file" accept=".ll,.txt">
-  </div>
-  <button id="run" class="primary" type="button">Optimize</button>
 </section>
 
 <div id="status" class="alert" role="alert" hidden></div>

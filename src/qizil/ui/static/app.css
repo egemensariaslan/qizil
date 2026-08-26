@@ -1,15 +1,19 @@
 /* ==========================================================================
    Qizil design system — "Instrument"
 
-   Dark-surface console (Linear/Vercel: hairline borders, one signal accent,
-   glow used only where it means something) laid out with Swiss editorial
-   discipline (numbered sections, small-caps rails, a strict modular grid,
-   tabular figures everywhere) in Bento-style cells of varying span.
+   A dark-surface developer tool in the vein of Linear/Vercel/Grafana:
+   layered fills carry the hierarchy first, hairlines second, and shadow
+   is reserved for things that actually float above the page. One signal
+   accent, glow used only where it means something (verified, primary
+   action). Bento-style cells of varying span; section identity comes from
+   clean sans-serif title case, not tracked all-caps monospace on every
+   header.
 
    Rules of the system:
-     - one accent (indigo) carries state; category colour is reserved for
+     - one accent (red) carries state; category colour is reserved for
        gate semantics and never used as decoration
-     - separation is a 1px hairline, never a shadow; glow means "verified"
+     - three surface fills (page / card / inset) do most of the hierarchy
+       work; hairlines reinforce edges, they don't do it alone
      - every number is monospace and tabular so columns align optically
      - motion is 150-650ms, ease-out, and never blocks reading
    No frameworks, no web fonts, no external requests.
@@ -18,14 +22,14 @@
 :root {
   color-scheme: dark;
 
-  /* surfaces */
-  --bg: #06070a;
-  --bg-2: #0b0d12;
-  --bg-3: #10131a;
-  --bg-4: #161a22;
-  --line: rgba(255, 255, 255, 0.07);
-  --line-2: rgba(255, 255, 255, 0.13);
-  --sheen: rgba(255, 255, 255, 0.045);
+  /* surfaces — page, card, inset (nested code/diff/circuit), track */
+  --bg: #0a0b0d;
+  --bg-2: #131519;
+  --bg-3: #1a1d22;
+  --bg-4: #22262c;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.14);
+  --sheen: rgba(255, 255, 255, 0.03);
 
   /* ink */
   --ink: #eceff5;
@@ -79,10 +83,10 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f4f5f8;
+  --bg: #eef0f3;
   --bg-2: #ffffff;
-  --bg-3: #f7f8fa;
-  --bg-4: #e9ecf1;
+  --bg-3: #f5f6f8;
+  --bg-4: #e7eaef;
   --line: rgba(9, 15, 28, 0.1);
   --line-2: rgba(9, 15, 28, 0.18);
   --sheen: rgba(9, 15, 28, 0.02);
@@ -189,6 +193,7 @@ body.busy .progress { width: 72%; opacity: 0.9; }
   padding: 34px 0 22px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
 }
@@ -208,8 +213,6 @@ body.busy .progress { width: 72%; opacity: 0.9; }
   background: var(--accent);
   vertical-align: middle;
 }
-.masthead .ghost { margin-left: auto; }
-
 .ghost {
   font-family: var(--mono);
   font-size: 10.5px;
@@ -224,47 +227,42 @@ body.busy .progress { width: 72%; opacity: 0.9; }
 }
 .ghost:hover { color: var(--ink); border-color: var(--ink-3); background: var(--sheen); }
 
-.command {
-  display: block;
-  flex: 1 1 320px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--ink-2);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: 8px 13px;
-  max-width: 100%;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-.command::before { content: "$ "; color: var(--accent); }
+/* -------------------------------------------------------------- toolbar -- */
 
-/* ------------------------------------------------------------- console -- */
-
-.console {
+.toolbar {
   max-width: var(--page);
   margin: 0 auto 22px;
+  padding: 15px 17px;
+  background: linear-gradient(180deg, var(--sheen), transparent 60px), var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12), 0 8px 24px -16px rgba(0, 0, 0, 0.4);
+}
+.toolbar-row {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 18px;
-  padding: 15px 17px;
-  background: linear-gradient(180deg, var(--sheen), transparent), var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
 }
+.toolbar-row + .toolbar-row {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  align-items: center;
+}
+.toolbar-run { gap: 12px; }
+
 .control { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-.control.grow { flex: 1 1 180px; }
-.control > label {
+.control.grow { flex: 1 1 200px; }
+.control > label,
+.control-label {
   font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
-select,
-input[type="file"] {
+select {
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ink);
@@ -272,11 +270,50 @@ input[type="file"] {
   border: 1px solid var(--line-2);
   border-radius: var(--r-sm);
   padding: 8px 10px;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
-select:hover,
-input[type="file"]:hover { border-color: var(--ink-3); }
-input[type="file"] { color: var(--ink-2); font-size: 11px; }
+select:hover { border-color: var(--ink-3); }
+
+/* A native <input type=file> renders as whatever the OS wants, which reads
+   as an un-designed hole in an otherwise deliberate page -- hidden (see
+   .sr-only on the element itself) behind a label styled to match every
+   other control here instead. */
+.dropzone {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  background: var(--bg-3);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.dropzone:hover,
+.dropzone.dragover {
+  border-color: var(--accent-line);
+  color: var(--ink);
+  background: var(--sheen);
+}
+.dropzone.dragover { border-style: solid; background: var(--accent-bg); }
+.dz-icon { width: 14px; height: 14px; flex: none; color: var(--ink-3); }
+.dropzone:hover .dz-icon { color: var(--accent); }
+.dz-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.command {
+  display: block;
+  flex: 1 1 260px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.command::before { content: "$ "; color: var(--accent); }
 
 .switches { gap: 6px; }
 .switch {
@@ -386,18 +423,12 @@ input[type="file"] { color: var(--ink-2); font-size: 11px; }
   margin-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
-.cell-head .idx {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--accent);
-}
 .cell-head h2 {
   margin: 0;
-  font-size: 11.5px;
-  font-weight: 650;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--sans);
+  font-size: 14.5px;
+  font-weight: 640;
+  letter-spacing: -0.005em;
   color: var(--ink);
 }
 .cell-head .meta {
@@ -454,10 +485,16 @@ input[type="file"] { color: var(--ink-2); font-size: 11px; }
   margin-top: 11px;
   font-family: var(--mono);
   font-size: 11px;
+  color: var(--ink-3);
+}
+/* A real change earns a pill; "no change" stays plain muted text instead of
+   an empty dash inside the same loud wrapper -- the pill should mean
+   something, not decorate every stat regardless of whether it moved. */
+.stat .d.good,
+.stat .d.bad {
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--line-2);
-  color: var(--ink-3);
 }
 .stat .d.good { color: var(--ok); border-color: var(--ok-line); background: var(--ok-bg); }
 .stat .d.bad { color: var(--bad); border-color: var(--bad-line); background: var(--bad-bg); }
@@ -509,49 +546,11 @@ input[type="file"] { color: var(--ink-2); font-size: 11px; }
 }
 .proof .fact .fv { font-family: var(--mono); font-size: 13px; color: var(--ink); }
 
-/* ---------------------------------------------------------------- bars -- */
+/* -------------------------------------------------------------- tables -- */
 
-.rows { display: grid; gap: 13px; }
-.row {
-  display: grid;
-  grid-template-columns: minmax(96px, 150px) 1fr 62px;
-  align-items: center;
-  gap: 14px;
-}
-.row .rk { font-size: 12.5px; color: var(--ink-2); }
-.row .rb { display: grid; gap: 4px; min-width: 0; }
-.bar { display: flex; align-items: center; gap: 10px; }
-.bar .track {
-  flex: 1;
-  display: block;
-  height: 7px;
-  min-width: 0;
-  background: var(--bg-4);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.bar .fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  border-radius: 4px;
-  transition: width 0.65s var(--ease);
-}
-.bar.a .fill { background: var(--ink-3); opacity: 0.5; }
-.bar.b .fill { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-.bar .n {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--ink-2);
-  min-width: 52px;
-  text-align: right;
-}
-.bar.b .n { color: var(--ink); }
-.chg { font-family: var(--mono); font-size: 12px; text-align: right; color: var(--ink-3); }
+.chg { color: var(--ink-3); }
 .chg.good { color: var(--ok); }
 .chg.bad { color: var(--bad); }
-
-/* -------------------------------------------------------------- tables -- */
 
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--line); }
@@ -650,44 +649,64 @@ tbody tr:hover { background: var(--sheen); }
 
 /* --------------------------------------------------------------- trace -- */
 
-.trace { max-height: 330px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
-.trace li {
-  display: flex;
-  gap: 11px;
-  align-items: baseline;
-  padding: 8px 2px;
+.trace { max-height: 380px; overflow-y: auto; }
+.trace-group {
   border-bottom: 1px solid var(--line);
+}
+.trace-group:last-child { border-bottom: 0; }
+.trace-group summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 4px;
+  cursor: pointer;
+  list-style: none;
   font-family: var(--mono);
   font-size: 11.5px;
+  color: var(--ink-2);
 }
-.trace li:last-child { border-bottom: 0; }
-.tag {
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 4px;
-  white-space: nowrap;
-  border: 1px solid var(--line-2);
+.trace-group summary::-webkit-details-marker { display: none; }
+.trace-group summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  flex: none;
+  border-style: solid;
+  border-width: 3.5px 0 3.5px 5px;
+  border-color: transparent transparent transparent var(--ink-3);
+  transition: transform 0.15s var(--ease);
+}
+.trace-group[open] summary::before { transform: rotate(90deg); }
+.trace-group summary:hover { color: var(--ink); }
+.dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot.cancel { background: var(--ok); }
+.dot.merge-rotations { background: var(--rot); }
+.dot.commute { background: var(--clifford); }
+.dot.clifford-t { background: var(--tgate); }
+.trace-group .pass { color: var(--ink); }
+.trace-group .count {
+  margin-left: auto;
   color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
 }
-.tag.cancel { color: var(--ok); border-color: var(--ok-line); background: var(--ok-bg); }
-.tag.merge-rotations {
-  color: var(--rot);
-  border-color: color-mix(in srgb, var(--rot) 40%, transparent);
-  background: var(--rot-bg);
+.trace-group ul {
+  margin: 0 0 10px;
+  padding: 0 4px 0 20px;
+  list-style: none;
 }
-.tag.commute {
-  color: var(--clifford);
-  border-color: color-mix(in srgb, var(--clifford) 40%, transparent);
-  background: var(--clifford-bg);
+.trace-group li {
+  padding: 3px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  word-break: break-word;
 }
-.tag.clifford-t {
-  color: var(--tgate);
-  border-color: color-mix(in srgb, var(--tgate) 40%, transparent);
-  background: var(--tgate-bg);
-}
-.trace .note { color: var(--ink-2); word-break: break-word; }
 .void { color: var(--ink-3); font-size: 12.5px; padding: 10px 0; font-family: var(--mono); }
 
 /* ---------------------------------------------------------------- diff -- */
@@ -742,6 +761,6 @@ tbody tr:hover { background: var(--sheen); }
 
 @media print {
   body { background: #fff; padding: 0; }
-  .console, .rail, .progress, .masthead-tools { display: none !important; }
+  .toolbar, .rail, .progress { display: none !important; }
   .cell, .hero, .proof { break-inside: avoid; animation: none; }
 }
