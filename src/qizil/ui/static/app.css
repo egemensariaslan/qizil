@@ -146,7 +146,8 @@ body {
   margin: 0;
   padding: 0 clamp(18px, 4vw, 44px) 80px;
   background:
-    radial-gradient(1100px 620px at 18% -12%, var(--glow), transparent 65%),
+    radial-gradient(1200px 680px at 15% -14%, var(--glow), transparent 62%),
+    radial-gradient(800px 500px at 88% 8%, var(--glow), transparent 70%),
     var(--bg);
   color: var(--ink);
   font-family: var(--sans);
@@ -405,6 +406,14 @@ select:hover { border-color: var(--ink-3); }
   border-radius: var(--r);
   padding: 18px 20px 22px;
   animation: rise 0.5s var(--ease) backwards;
+  transition: transform 0.18s var(--ease), border-color 0.18s, box-shadow 0.18s;
+}
+/* A small lift on hover is the one place this system borrows a shadow --
+   it reads as "this surface can move," which a hairline alone can't say. */
+.cell:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow: 0 12px 28px -18px rgba(0, 0, 0, 0.5);
 }
 .cell.s4 { grid-column: span 4; }
 .cell.s5 { grid-column: span 5; }
@@ -525,14 +534,25 @@ select:hover { border-color: var(--ink-3); }
   border-color: var(--bad-line);
   background: linear-gradient(90deg, var(--bad-bg), transparent 58%), var(--bg-2);
 }
-.proof .seal { flex: none; font-size: 15px; line-height: 1; }
-.proof.ok .seal { color: var(--ok); }
-.proof.warn .seal { color: var(--warn); }
-.proof.fail .seal { color: var(--bad); }
+.proof .seal {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+}
+/* The one badge in this system that repeats itself only once per page --
+   it gets to be a little more confident about it than a table cell would. */
+.proof.ok .seal { color: var(--ok); background: var(--ok-bg); box-shadow: 0 0 0 5px var(--ok-bg); }
+.proof.warn .seal { color: var(--warn); background: var(--warn-bg); }
+.proof.fail .seal { color: var(--bad); background: var(--bad-bg); box-shadow: 0 0 0 5px var(--bad-bg); }
 .proof .claim {
   font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 650;
   letter-spacing: 0.01em;
 }
 .proof .facts { margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px 26px; }

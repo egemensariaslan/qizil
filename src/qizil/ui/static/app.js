@@ -89,14 +89,49 @@
 
   // ------------------------------------------------------------------ hero
 
+  // The headline numbers are the first thing anyone sees; counting them
+  // down/up from the "before" value on load is one deliberate moment of
+  // motion, not a repeated pattern, so it doesn't reopen the "everything
+  // is animated" problem the rest of this file deliberately avoids.
+  var pendingCounts = [];
+
+  function animateValue(node, from, to, duration) {
+    if (typeof from !== "number" || typeof to !== "number" || from === to) {
+      node.textContent = num(to);
+      return;
+    }
+    // Gate/depth/qubit counts are always whole numbers; only interpolate
+    // fractionally when the real values are fractional too (runtime, in
+    // microseconds), or "94.18 gates" flashes by on every single run.
+    var wholeCounts = Number.isInteger(from) && Number.isInteger(to);
+    var start = null;
+    function tick(now) {
+      if (start === null) start = now;
+      var t = Math.min((now - start) / duration, 1);
+      var eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      var value = t < 1 ? from + (to - from) * eased : to;
+      node.textContent = num(wholeCounts ? Math.round(value) : value);
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function flushCounts() {
+    var queued = pendingCounts;
+    pendingCounts = [];
+    queued.forEach(function (entry) { animateValue(entry[0], entry[1], entry[2], 700); });
+  }
+
   function heroStat(label, before, after, suffix) {
     var d = delta(before, after);
+    var to = el("span", { class: "to" });
+    pendingCounts.push([to, before, after]);
     return el("div", { class: "stat" },
       el("span", { class: "k", text: label }),
       el("span", { class: "v" },
         el("span", { class: "from", text: num(before) }),
         el("span", { class: "arrow", text: "→" }),
-        el("span", { class: "to", text: num(after) }),
+        to,
         suffix ? el("span", { class: "unit", text: suffix }) : null),
       el("span", { class: "d " + d.cls, text: d.text }));
   }
@@ -458,6 +493,7 @@
     app.appendChild(renderTrace(data));
     app.appendChild(renderHistogram(data));
     app.appendChild(renderDiff(data));
+    flushCounts();
 
     // Reflects only flags actually in effect for this run -- data.verification
     // is null when verify wasn't requested, not just when it failed, so that
