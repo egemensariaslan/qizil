@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+title: >-
+  Qizil: A Peephole and Commutation Optimizer for Quantum
+  Intermediate Representation
+message: >-
+  If you use this software, or results produced with it, please cite it.
+  Please also state whether a figure comes from the shipped examples or
+  from the randomized test suite — they measure different things.
+type: software
+authors:
+  - given-names: Egemen
+    family-names: Sarıaslan
+version: 0.2.0
+date-released: '2026-08-27'
+license: MIT
+repository-code: 'https://github.com/egemensariaslan/qizil'
+abstract: >-
+  Qizil reads QIR (the LLVM-based intermediate representation Q#, Qiskit
+  and PennyLane all target), builds a per-block quantum instruction DAG,
+  and applies four peephole passes -- cancellation, rotation fusion,
+  commutation-based reordering and Clifford+T resynthesis -- to a fixed
+  point. Every rewrite is a closed-form algebraic identity, and every
+  optimization run can be checked against two independent reference
+  simulators for exact unitary equivalence up to a tracked global phase.
+  On a 5-qubit Quantum Fourier Transform immediately followed by its own
+  exact inverse, the optimizer collapses all 94 gates to 0, confirmed to
+  1.44e-15 by the reference simulator. The equivalence checker itself is
+  cross-checked against an independently implemented dense-embedding
+  oracle, which caught a real operand-ordering bug before it shipped.
+notes: >-
+  Capstone project for the Microsoft AI/ML Summer Internship Programme,
+  2026. A capstone project produced during the programme; not affiliated
+  with or endorsed by Microsoft Corporation.
+keywords:
+  - quantum computing
+  - compiler optimization
+  - QIR
+  - fault-tolerant quantum computing
+  - formal verification
+  - peephole optimization
+  - LLVM

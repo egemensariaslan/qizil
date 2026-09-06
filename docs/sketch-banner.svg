@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300">
+  <title>Qizil</title>
+  <desc>Qizil, a QIR compiler optimizer. A circuit enters dense with seven gates -- a repeated Hadamard, a cancelling T / T-dagger pair, two fusable rotations, one CNOT -- and leaves with two: the CNOT nothing could cancel, and the two rotations fused into one.</desc>
+  <style>
+    .bg    { fill: #FDFCFA }
+    .ink   { fill: #16161A; stroke: #16161A }
+    .muted { fill: #454B59; stroke: #454B59 }
+    .faint { fill: #646A78; stroke: #646A78 }
+    .s     { stroke: #16161A; stroke-width: 2; fill: none; stroke-linecap: round }
+    .thin  { stroke: #454B59; stroke-width: 1.6; fill: none; stroke-linecap: round }
+    .dash  { stroke: #646A78; stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-dasharray: 8 6 }
+    .h-clifford { stroke: #2f62c4 }
+    .h-tgate    { stroke: #91630a }
+    .h-rot      { stroke: #6d3ab8 }
+    .h-two      { stroke: #14705c }
+    [class^="h-"] { stroke-width: 1.7; fill: none }
+    .box   { fill: #FDFCFA; stroke: #16161A; stroke-width: 1.8; }
+    .box2  { fill: none; stroke: #16161A; stroke-width: 1; opacity: 0.55; }
+    .lbl   { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; fill: #16161A; text-anchor: middle; }
+    .word  { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 700; font-size: 30px; letter-spacing: 5px; fill: #16161A; }
+    .word .i { fill: #cf2c22; }
+    .tag   { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14.5px; fill: #454B59; }
+    .cnt   { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; fill: #646A78; text-anchor: middle; }
+    @media (prefers-color-scheme: dark) {
+      .bg    { fill: #0E1117 }
+      .ink   { fill: #F2F4F8; stroke: #F2F4F8 }
+      .muted { fill: #C2C8D4; stroke: #C2C8D4 }
+      .faint { fill: #9AA1AE; stroke: #9AA1AE }
+      .s     { stroke: #F2F4F8 }
+      .thin  { stroke: #C2C8D4 }
+      .dash  { stroke: #9AA1AE }
+      .h-clifford { stroke: #78a9ff }
+      .h-tgate    { stroke: #f2b544 }
+      .h-rot      { stroke: #bb8cf5 }
+      .h-two      { stroke: #5fd6b6 }
+      .box   { fill: #0E1117; stroke: #F2F4F8; }
+      .box2  { stroke: #F2F4F8; }
+      .lbl   { fill: #F2F4F8; }
+      .word  { fill: #F2F4F8; }
+      .word .i { fill: #f2453d; }
+      .tag   { fill: #C2C8D4; }
+      .cnt   { fill: #9AA1AE; }
+    }
+  </style>
+
+  <defs>
+    <pattern id="hz-clifford" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" class="h-clifford"/>
+    </pattern>
+    <pattern id="hz-tgate" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" class="h-tgate"/>
+    </pattern>
+    <pattern id="hz-rot" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" class="h-rot"/>
+    </pattern>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1200" height="300"/>
+
+  <!-- wires -->
+  <line class="thin" x1="70" y1="100" x2="1150" y2="100"/>
+  <line class="thin" x1="70" y1="190" x2="1150" y2="190"/>
+  <text class="lbl" x="45" y="105" text-anchor="end">q0</text>
+  <text class="lbl" x="45" y="195" text-anchor="end">q1</text>
+
+  <!-- ===== before: seven gates, dense ===== -->
+
+  <!-- H · H on q0 -->
+  <g>
+    <rect class="box2" x="115" y="82" width="30" height="30" rx="4" transform="rotate(-1.5 130 97)"/>
+    <rect class="box" x="115" y="83" width="30" height="30" rx="4"/>
+    <rect x="115" y="83" width="30" height="30" rx="4" fill="url(#hz-clifford)"/>
+    <text class="lbl" x="130" y="103">H</text>
+  </g>
+  <g>
+    <rect class="box2" x="165" y="82" width="30" height="30" rx="4" transform="rotate(1.5 180 97)"/>
+    <rect class="box" x="165" y="83" width="30" height="30" rx="4"/>
+    <rect x="165" y="83" width="30" height="30" rx="4" fill="url(#hz-clifford)"/>
+    <text class="lbl" x="180" y="103">H</text>
+  </g>
+
+  <!-- CNOT: control q0, target q1 -->
+  <g>
+    <line class="h-two" x1="230" y1="100" x2="230" y2="190"/>
+    <circle class="h-two" cx="230" cy="100" r="5" fill="currentColor"/>
+    <circle class="box" cx="230" cy="190" r="15"/>
+    <circle cx="230" cy="190" r="15" fill="none" class="h-two"/>
+    <line class="h-two" x1="220" y1="190" x2="240" y2="190"/>
+    <line class="h-two" x1="230" y1="180" x2="230" y2="200"/>
+  </g>
+
+  <!-- T · T-dagger on q1 -->
+  <g>
+    <rect class="box2" x="265" y="172" width="30" height="30" rx="4" transform="rotate(-1.5 280 187)"/>
+    <rect class="box" x="265" y="173" width="30" height="30" rx="4"/>
+    <rect x="265" y="173" width="30" height="30" rx="4" fill="url(#hz-tgate)"/>
+    <text class="lbl" x="280" y="193">T</text>
+  </g>
+  <g>
+    <rect class="box2" x="315" y="172" width="30" height="30" rx="4" transform="rotate(1.5 330 187)"/>
+    <rect class="box" x="315" y="173" width="30" height="30" rx="4"/>
+    <rect x="315" y="173" width="30" height="30" rx="4" fill="url(#hz-tgate)"/>
+    <text class="lbl" x="330" y="193">T&#8224;</text>
+  </g>
+
+  <!-- Rz · Rz on q0, same axis -->
+  <g>
+    <circle class="box2" cx="380" cy="100" r="16" transform="rotate(-2 380 100)"/>
+    <circle class="box" cx="380" cy="100" r="16"/>
+    <circle cx="380" cy="100" r="16" fill="url(#hz-rot)"/>
+    <text class="lbl" x="380" y="105">Rz</text>
+  </g>
+  <g>
+    <circle class="box2" cx="430" cy="100" r="16" transform="rotate(2 430 100)"/>
+    <circle class="box" cx="430" cy="100" r="16"/>
+    <circle cx="430" cy="100" r="16" fill="url(#hz-rot)"/>
+    <text class="lbl" x="430" y="105">Rz</text>
+  </g>
+
+  <text class="cnt" x="280" y="248">7 gates</text>
+
+  <!-- transition -->
+  <line class="dash" x1="490" y1="145" x2="630" y2="145"/>
+  <path class="dash" d="M622 137 L636 145 L622 153"/>
+  <text class="tag" x="560" y="122" text-anchor="middle">cancel &#183; fuse &#183; commute</text>
+
+  <!-- ===== after: two gates survive ===== -->
+
+  <!-- CNOT: the pair with nothing to cancel against -->
+  <g>
+    <line class="h-two" x1="760" y1="100" x2="760" y2="190"/>
+    <circle class="h-two" cx="760" cy="100" r="5" fill="currentColor"/>
+    <circle class="box" cx="760" cy="190" r="15"/>
+    <circle cx="760" cy="190" r="15" fill="none" class="h-two"/>
+    <line class="h-two" x1="750" y1="190" x2="770" y2="190"/>
+    <line class="h-two" x1="760" y1="180" x2="760" y2="200"/>
+  </g>
+
+  <!-- the fused rotation -->
+  <g>
+    <circle class="box2" cx="980" cy="100" r="17" transform="rotate(-2 980 100)"/>
+    <circle class="box" cx="980" cy="100" r="17"/>
+    <circle cx="980" cy="100" r="17" fill="url(#hz-rot)"/>
+    <text class="lbl" x="980" y="105">Rz</text>
+  </g>
+
+  <text class="cnt" x="870" y="248">2 gates</text>
+
+  <line class="s" x1="70" y1="230" x2="1150" y2="230" opacity="0"/>
+
+  <text class="word" x="70" y="280">Q<tspan class="i">I</tspan>ZIL</text>
+  <text class="tag" x="1150" y="280" text-anchor="end">QIR compiler optimization &#8212; proved, not assumed.</text>
+</svg>
