@@ -1,282 +1,84 @@
-# Qizil — QIR-Opt
+![Qizil — a QIR compiler optimizer: seven gates in, cancelled and fused down to two](docs/sketch-banner.svg)
 
-[![CI](https://github.com/egemen/qizil/actions/workflows/ci.yml/badge.svg)](https://github.com/egemen/qizil/actions/workflows/ci.yml)
+<p>
+  <img src="https://img.shields.io/badge/passes-4-16181D?style=flat-square&labelColor=EFEDE6" alt="4 optimization passes">
+  <img src="https://img.shields.io/badge/proof%20error-1.44e--15-16181D?style=flat-square&labelColor=EFEDE6" alt="1.44e-15 max error on the strongest proof">
+  <img src="https://img.shields.io/badge/tests-484-16181D?style=flat-square&labelColor=EFEDE6" alt="484 tests">
+  <img src="https://img.shields.io/badge/runtime%20deps-0-16181D?style=flat-square&labelColor=EFEDE6" alt="zero runtime dependencies">
+  <img src="https://img.shields.io/badge/python-3.10%2B-16181D?style=flat-square&labelColor=EFEDE6" alt="Python 3.10+">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-16181D?style=flat-square&labelColor=EFEDE6" alt="MIT licence"></a>
+</p>
 
-A compiler optimization module for **QIR** (Quantum Intermediate Representation).
-Qizil reads QIR as `.ll` or `.bc`, builds a quantum instruction DAG, applies
-peephole cancellation, rotation fusion, commutation-based reordering and
-Clifford+T resynthesis, and writes back optimized QIR — with every classical
-instruction, basic block, measurement and piece of metadata exactly where it was.
+> **Built for the Microsoft AI/ML Summer Internship Programme, 2026.**
+> Capstone project by **Egemen Sarıaslan**, covering algorithm design, implementation, formal verification and benchmarking. Carried out under the supervision of Microsoft Cloud Solution Architects Management.
+>
+> <sub>A capstone project produced during the programme. Not a Microsoft product, not affiliated with or endorsed by Microsoft Corporation; Microsoft and Azure are their trademarks.</sub>
 
-## Quick start
+A compiler optimization pass for **QIR** — the LLVM-based intermediate representation Q#, Qiskit and PennyLane all lower to. Qizil reads a module as `.ll` or `.bc`, cancels and fuses redundant quantum gates, resynthesizes Clifford+T runs, and writes back optimized QIR — with every classical instruction, basic block, measurement and piece of metadata exactly where it was.
 
-Two commands. No install, no dependencies, no virtualenv — any Python ≥ 3.10:
+The name is the thesis, in two senses at once. *Qızıl* is Turkic for a sharp, saturated red — and also for gold, the metal. The colour is the cost signal: what the optimizer removes was going to cost something real. The metal is the standard it holds itself to: a rewrite is only worth making if it can be **proved**, not just tested, to compute the same thing it replaced.
 
-```console
-git clone https://github.com/egemen/qizil && cd qizil
+|  | what it removes | how it's justified |
+|---|---|---|
+| **cancel** | adjacent gate pairs whose product is the identity — `H·H`, `T·T†`, `CX·CX` | a checked algebraic identity, not a heuristic |
+| **merge-rotations** | same-axis rotations that were only ever one rotation | angle addition in a closed normal form |
+| **commute** | the same two rewrites, found *through* gates that provably don't interfere | a Pauli-axis commutation rule, not a pattern match |
+| **clifford-t** | a whole same-axis run, re-synthesized as the cheapest exact sequence | the Clifford+T ladder — exact for multiples of π/4 |
 
-./qizil examples/trotter_step.ll -O3 -o optimized.ll
-```
+Every model here runs on ordinary text QIR; nothing above needs a quantum computer, a simulator with more than a laptop's worth of memory, or a training set. It needs the algebra to be right, and it proves that it is.
 
-```
-qizil 0.1.0  examples/trotter_step.ll  (-O3)
+![The pipeline: parser to IR model to four passes at a fixed point to emitter, with a per-block DAG feeding commutation analysis](docs/sketch-pipeline.svg)
 
-  metric                   before      after   change
-  ----------------------------------------------------
-  qubits                        4          4       0%
-  quantum instructions        104         76   -26.9%
-  gates                       100         72   -28.0%
-  1-qubit gates                76         50   -34.2%
-  2-qubit gates                24         22    -8.3%
-  arbitrary rotations          44         34   -22.7%
-  depth                        53         44   -17.0%
-  measurements                  4          4       0%
-
-  passes: cancel x9, merge-rotations x9, commute x1  (2 iterations)
-  gates:  cnot 24->22, h 32->16, mz 4, rz 44->34
-```
-
-That is the whole setup. `./qizil` works from any directory
-(`/path/to/qizil/qizil input.ll -O2 -o out.ll`), and on Windows as
-`python qizil input.ll -O2 -o out.ll`.
-
-Add `--verify` to have the rewrite *proved* against a reference simulator
-(the only flag that wants a dependency — without numpy it reports `skipped`,
-never a false pass):
-
-```console
-pip install numpy
-./qizil examples/trotter_step.ll -O3 -o optimized.ll --verify
-#   verify: unitary preserved over 1 segment(s), max error 2.27e-15
-```
-
-See it, rather than read it — a browser UI with circuit diagrams, before/after
-charts, the rewrite trace and the equivalence proof:
-
-```console
-./qizil ui                                   # opens http://127.0.0.1:8731
-./qizil report input.ll -O3 -o report.html   # same page as one shareable file
-```
-
-**Zero runtime dependencies.** The parser, the DAG, the passes, the metrics,
-the equivalence checker and the UI are all pure Python stdlib — no numpy, no
-web framework, no CDN. PyQIR is optional and only used at the edges (bitcode
-in/out, LLVM verification); numpy is optional and only makes the equivalence
-check faster and wider.
+<sub>Every module, function and pass boundary, spelled out: [the detailed architecture](docs/design.md).</sub>
 
 ---
 
-## Why
+## Table of contents
 
-QIR is the industry standard for representing quantum programs on top of LLVM,
-but native optimization passes for it are sparse. QIR emitted by Q#, Qiskit or
-PennyLane routinely contains redundant unitaries, uncoalesced rotations and
-avoidable `T` gates. On a fault-tolerant machine those are not cosmetic: a `T`
-gate needs a magic state factory, and an *arbitrary-angle* rotation needs tens
-of `T` gates of synthesis. Cutting them cuts physical qubits and wall-clock
-runtime.
+- [1. The problem](#1-the-problem)
+- [2. Results](#2-results)
+- [3. The passes](#3-the-passes)
+- [4. Is the equivalence proof trustworthy?](#4-is-the-equivalence-proof-trustworthy)
+- [5. Where it can still go wrong](#5-where-it-can-still-go-wrong)
+- [6. Engineering](#6-engineering)
+- [7. Running it](#7-running-it)
+- [8. Repository layout](#8-repository-layout)
+- [9. Known limitations](#9-known-limitations)
+- [10. References](#10-references) · [Licence and citation](#licence-and-citation) · [Author](#author)
 
-## Install (optional)
+---
 
-Nothing here is required — `./qizil` in a clone is fully functional. Install
-only if you want `qizil` on your PATH without the clone path:
+## 1. The problem
 
-```console
-uv tool install '.[verify,bitcode]'     # or: pipx install '.[verify,bitcode]'
-pip install -e '.[dev]'                 # or into an active virtualenv, + pytest
-```
+On a fault-tolerant, error-corrected quantum computer, a logical `T` gate is not free. It costs a round of *magic-state distillation* — a dedicated factory of physical qubits producing one clean `T` state at a time. An *arbitrary-angle* rotation is worse: it has no exact finite gate sequence at all, so it gets approximated by a chain of tens of `T` gates before it can run.
 
-The extras are all optional; the core never needs them:
+Neither cost is visible in the circuit as written. A rotation looks like one instruction in the source, whether it ends up costing one physical operation or fifty — and that gap between what a circuit *reads like* and what it *costs* is exactly where redundancy hides.
 
-| extra | adds | needs |
-| --- | --- | --- |
-| *(none)* | parsing, all four passes, metrics, estimator | — |
-| `bitcode` | `.bc` input/output, `--llvm-check` | PyQIR |
-| `verify` | faster checking, up to 12 qubits (the check itself needs nothing) | numpy |
-| `azure` | the real Azure Quantum Resource Estimator backend | azure-quantum |
+What most quantum SDKs don't do is optimize the intermediate representation itself. Q#, Qiskit and PennyLane all lower to **QIR** — a common, LLVM-based IR — but native optimization passes for it are sparse, so a QIR module routinely reaches whatever runs next carrying gates a real compiler would already have removed: two Hadamards back to back, a rotation split across a gate boundary, a `T` that could have commuted past a CNOT to meet and cancel its pair.
 
-> Not on PyPI yet. Once published, `pip install qizil` (or `uvx qizil …` to run
-> it without installing) replaces the clone step above.
+Qizil is a peephole optimizer purpose-built for that gap. It removes what a fault-tolerant backend would otherwise have to pay for, and it proves — numerically, against an independent reference simulator, twice — that the circuit it hands back computes the same thing.
 
-## The UI
+---
 
-`./qizil ui` serves a local page (stdlib `http.server`, loopback only) that
-runs the pipeline live: pick a circuit, slide between `-O0` and `-O3`, and
-watch what each level does. Dark by default with a light toggle, no web fonts
-and no CDN — see [docs/design-system.md](docs/design-system.md) for the visual
-language and how to add a panel to it.
+## 2. Results
 
-| panel | what it shows |
-| --- | --- |
-| proof banner | equivalence verdict, max matrix error, segments checked, simulator used, global phase, LLVM verdict |
-| circuit | the actual circuit before and after — qubit wires, CNOT controls, rotation angles, T gates highlighted; hover a gate for its QIR instruction |
-| metrics | before/after bars for instructions, gates, depth, T-count, arbitrary rotations |
-| fault-tolerant resources | logical qubits, code distance, T states, physical qubits, runtime |
-| rewrite trace | every rewrite with the identity that justifies it (`h(q0) · h(q0) = I`) |
-| gates by kind | histogram of every operation |
-| QIR diff | the changed lines, with everything else emitted byte for byte |
+Every number below is reproducible from a clean clone — `pytest` regenerates the test evidence, and every example ships in `examples/`.
 
-`./qizil report input.ll -o report.html` writes the same page as a single
-self-contained file — CSS, JS and data inlined, no network access — for a
-paper, a PR comment, or a CI artifact.
+### The strongest proof in the project
 
-## Command line
-
-Everything below works as `./qizil ...` from a clone, or as `qizil ...` once
-installed.
+`examples/qft_roundtrip.ll` is a 5-qubit Quantum Fourier Transform immediately followed by its own exact inverse. `QFT · QFT⁻¹ = I` is a mathematical fact independent of this tool — checkable by hand from `H·H=I`, `CNOT·CNOT=I` and `Rz(t)·Rz(−t)=I` alone. This is the one case where the *answer was known before the optimizer ran*:
 
 ```console
-qizil input.ll -O2 -o output.ll        # optimize (the subcommand is optional)
-qizil input.bc -O3 -o output.bc        # bitcode in, bitcode out
-qizil stats input.ll                   # gate counts, depth, T-count
-qizil estimate input.ll -O2            # fault-tolerant resources, before vs after
-qizil verify before.ll after.ll        # prove two modules are the same unitary
-qizil ui                               # browser UI: diagrams, charts, proof
-qizil report input.ll -o report.html   # standalone HTML report
-qizil dag input.ll --dot | dot -Tsvg   # visualize the instruction graph
-qizil passes                           # list passes and pipelines
+$ qizil examples/qft_roundtrip.ll -O3 --verify
+  gates          94 -> 0      (-100.0%)
+  depth          55 -> 1      (-98.2%)
+  verify: unitary preserved over 1 segment(s), max error 1.44e-15
 ```
 
-Useful flags on `optimize`:
+### Six shipped circuits, at `-O3 --verify`
 
-| flag | effect |
-| --- | --- |
-| `-O0 … -O3` | pipeline selection; `-O0` is a byte-exact passthrough |
-| `--passes cancel,commute` | run exactly these passes |
-| `--disable clifford-t` | drop a pass from the pipeline |
-| `--gateset strict` | never introduce a gate the input did not already use |
-| `--preserve-global-phase` | reject rewrites that are only correct up to phase |
-| `--verify` | check unitary equivalence against the input (needs numpy) |
-| `--llvm-check` | run the output through LLVM's verifier (needs PyQIR) |
-| `--report r.json` | machine-readable report of every rewrite |
-| `-v` | print each rewrite as it is applied |
-
-## Python API
-
-```python
-import qizil
-
-result = qizil.optimize("circuit.ll", level=2, verify=True)
-
-print(result.before.gates, "->", result.after.gates)
-print(result.after.t_count, "T gates remain")
-print(result.verification.ok)               # True
-open("out.ll", "w").write(result.to_ll())
-
-est = result.estimates(error_budget=1e-3)   # before/after resource estimate
-print(est.to_dict()["physical_qubits"])
-```
-
-Lower-level pieces are public too:
-
-```python
-from qizil import parse_file, build_pipeline, PassManager
-from qizil.passes import PassContext, SynthesisPolicy
-from qizil.ir.dag import BlockDag
-
-module = parse_file("circuit.ll")
-ctx = PassContext(policy=SynthesisPolicy.from_module(module))
-PassManager(build_pipeline(level=2), max_iterations=8).run(module, ctx)
-
-for fn, block in module.blocks():
-    print(BlockDag(block).to_dot(fn.name))
-```
-
-## Passes
-
-| pass | `-O` | what it does |
-| --- | --- | --- |
-| `cancel` | 1, 2, 3 | deletes adjacent pairs whose product is the identity: `H·H`, `X·X`, `CX·CX`, `T·T†`, `Rz(θ)·Rz(−θ)` |
-| `merge-rotations` | 1, 2, 3 | fuses same-axis rotations on the same qubits: `Rz(θ₁)·Rz(θ₂) → Rz(θ₁+θ₂)`, also `Rxx/Ryy/Rzz` |
-| `commute` | 2, 3 | re-runs both of the above, searching *through* gates that commute with the candidate |
-| `clifford-t` | 2, 3 | collects a maximal same-axis run per qubit and re-emits the cheapest exact sequence |
-
-The pipeline repeats until it reaches a fixed point (`-O2`: up to 8 rounds,
-`-O3`: up to 24).
-
-### The commutation rule
-
-Two gates commute when, on **every qubit they share**, both act through the
-same Pauli axis — because then their generators commute. Each operand slot of
-each gate carries its axis in the gate table:
-
-| gate | slot axes | so it commutes with |
-| --- | --- | --- |
-| `Rz`, `S`, `T`, `Z` | `Z` | anything diagonal on that qubit |
-| `Rx`, `X` | `X` | `X`-type gates on that qubit |
-| `CX(c,t)` | `Z` on `c`, `X` on `t` | `Z`-rotations on the control, `X`-rotations on the target |
-| `CZ(a,b)` | `Z`, `Z` | diagonals on either qubit |
-| `H`, `SWAP` | — | nothing it shares a qubit with |
-
-That is what lets `T · CX(q₀,q₁) · T` become `CX(q₀,q₁) · S`: the CNOT's control
-leg is diagonal, so the two `T`s meet.
-
-### Clifford+T resynthesis
-
-Every single-qubit gate is normalized to `exp(i·φ)·R_axis(θ)`, a run is summed,
-and the cheapest sequence reproducing the total is emitted:
-
-| total Z rotation | emitted | T-count |
-| --- | --- | --- |
-| `0` | *(nothing)* | 0 |
-| `π/4` | `T` | 1 |
-| `π/2` | `S` | 0 |
-| `3π/4` | `S·T` | 1 |
-| `π` | `Z` | 0 |
-| `5π/4` | `Z·T` | 1 |
-| `3π/2` | `S†` | 0 |
-| `7π/4` | `T†` | 1 |
-| anything else | `Rz(θ)` | — (needs synthesis) |
-
-Note the last row: an `Rz` whose angle *happens* to be a multiple of `π/4` is
-replaced by exact Clifford+T rather than being handed to a rotation
-synthesizer, which is worth tens of `T` gates per rotation downstream.
-
-## Correctness
-
-The unitary is preserved exactly. `qizil verify` (and `--verify`) checks this
-rather than assuming it:
-
-- both modules are split into segments at every non-unitary instruction —
-  measurements, resets, runtime calls, classical code, terminators;
-- the segments must line up **textually**, so a rewrite cannot hide a changed
-  measurement order or control flow behind a matching matrix;
-- each gate run between fences is simulated and compared as a matrix.
-
-Global phase is tracked, not discarded: `Module.global_phase` is the phase such
-that `U_original == exp(i·global_phase) · U_output`, it is reported in the
-summary, and `--preserve-global-phase` refuses any rewrite that would change it
-(useful if the rewritten block is later lifted into a controlled form).
-
-What the passes will **not** touch:
-
-- anything across a basic block boundary — every rewrite is intra-block;
-- anything across a measurement, reset, `__quantum__rt__*` call, unrecognized
-  `__quantum__qis__*` gate, or a `__ctl`/`__ctladj` functor — these are
-  scheduling barriers;
-- any gate on a qubit pointer that is not a compile-time constant or a direct
-  `__quantum__rt__qubit_allocate` result — an opaque pointer may alias anything,
-  so nothing may move;
-- rotations whose angle is an SSA value rather than a constant (dynamic angles
-  usually come from measurement feedback);
-- every line the passes did not rewrite, which is emitted **byte for byte** —
-  `-O0` output is identical to the input.
-
-The test suite (484 tests, CI-checked on Python 3.10-3.13, Linux/macOS/Windows,
-with *and* without numpy/PyQIR installed) includes ~300 randomized circuits
-checked against two independent reference simulator implementations at every
-optimization level. See [`docs/VALIDATION.md`](docs/VALIDATION.md) for the
-full methodology, and [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) for measured
-performance numbers, including two real defects found and fixed while
-building this (a cubic blowup in one pass, a cubic-vs-quadratic verifier
-bug) with the before/after data to show it.
-
-## Results on the shipped examples
-
-`qizil <example> -O3 --verify`:
-
-| example | instructions | gates | depth | T-count | arbitrary rotations |
-| --- | --- | --- | --- | --- | --- |
+| circuit | instructions | gates | depth | T-count | arb. rotations |
+|---|---|---|---|---|---|
 | `bell_redundant.ll` | 13 → 7 | 11 → 5 | 10 → 5 | 4 → 0 | 0 → 0 |
 | `commuting_t.ll` | 12 → 7 | 10 → 5 | 10 → 6 | 4 → 0 | 0 → 0 |
 | `adaptive_branch.ll` | 17 → 6 | 14 → 3 | 17 → 6 | 4 → 0 | 2 → 0 |
@@ -284,18 +86,9 @@ bug) with the before/after data to show it.
 | `trotter_step.ll` | 104 → 76 | 100 → 72 | 53 → 44 | 0 → 0 | 44 → 34 |
 | `qft_roundtrip.ll` | 99 → 5 | 94 → 0 | 55 → 1 | 0 → 0 | 24 → 0 |
 
-All six verify as equivalent and pass LLVM's module verifier.
-`trotter_step.ll` is four symmetric Trotter steps of a 4-spin transverse-field
-Ising chain (`examples/gen_trotter.py`); the estimator reports −23% T states and
-−22% runtime for it. `qft_roundtrip.ll` is a 5-qubit Quantum Fourier Transform
-immediately followed by its own exact inverse
-(`examples/gen_qft.py`) — mathematically the identity, `QFT · QFT⁻¹ = I`, a
-fact independent of this tool. Every gate collapses: 94 → 0, depth 55 → 1,
-verified to 1.4e-15 with zero global phase — see
-[`docs/VALIDATION.md`](docs/VALIDATION.md#layer-3--a-closed-form-ground-truth-not-a-self-reported-one)
-for why this is the strongest correctness demonstration in the project.
+All six verify as equivalent to their input and pass LLVM's own module verifier. `trotter_step.ll` is four symmetric Trotter steps of a 4-spin transverse-field Ising chain — a realistic algorithmic circuit, not a synthetic stress test — and its resource-estimate delta is below.
 
-## Resource estimation
+### From gate count to physical cost
 
 ```console
 $ qizil estimate examples/trotter_step.ll -O3
@@ -310,134 +103,203 @@ $ qizil estimate examples/trotter_step.ll -O3
   runtime (us)         2943.600   2288.000   -22.3%
 ```
 
-The default `local` backend is an offline analytic surface-code model in the
-style of the Azure Quantum Resource Estimator (arXiv:2211.07629): layout
-overhead `2Q + ⌈√(8Q)⌉ + 1`, code distance from the threshold formula
-`0.03·(p/0.01)^((d+1)/2)`, rotation synthesis at `0.53·log₂(1/ε) + 5.3` T gates
-each, and an error budget split three ways. **The T-factory footprint uses a
-simplified 15-to-1 model** and should be read as indicative; the delta between
-two runs of the same model is the trustworthy part. For authoritative numbers,
-`qizil.analysis.estimator.estimate_azure()` submits the module to the real
-`microsoft.estimator` target.
-
-## Architecture
-
-```
-  .ll / .bc                                                       .ll / .bc
-      |                                                               ^
-      v                                                               |
- +----------+     +-----------+     +--------------------+     +-------------+
- |  parser  | --> | instruction| -->|   pass pipeline    | --> |   emitter   |
- | (text,   |     |   model    |    | cancel             |     | (verbatim   |
- |  line-   |     | Module /   |    | merge-rotations    |     |  unless     |
- |  exact)  |     | Function / |    | commute            |     |  rewritten) |
- +----------+     | Block /    |    | clifford-t         |     +-------------+
-      |           | Instruction|    +--------------------+
-      |           +-----------+              ^
-      |                 |                    |
-      |                 v                    |
-      |          +--------------+     +--------------+
-      +--------> | BlockDag     | --> | commutation  |
-                 | (qubit deps, |     | + alias      |
-                 |  barriers)   |     |   analysis   |
-                 +--------------+     +--------------+
-```
-
-| module | role |
-| --- | --- |
-| `qizil.ir.parser` | line-oriented LLVM IR parser; recognizes QIS calls, keeps everything else opaque |
-| `qizil.ir.values` | operand model, qubit aliasing, LLVM double literals (including the `0x…` hex form) |
-| `qizil.ir.gates` | the gate table: arities, axes, Hermiticity, normal forms |
-| `qizil.ir.dag` | per-block dependency DAG, commutation rule, movement legality |
-| `qizil.ir.module` | Module/Function/BasicBlock/Instruction + byte-exact emitter |
-| `qizil.passes.*` | the four passes, the algebra they share, and the fixed-point driver |
-| `qizil.analysis.*` | circuit metrics and the resource estimator |
-| `qizil.verify.*` | reference simulator and equivalence checker |
-
-## Limitations
-
-Known, deliberate, and each one fails safe (the code is left alone):
-
-- rewrites are intra-block; no cross-block or loop-level optimization;
-- `__ctl` / `__ctladj` functors are opaque (their control operand is an
-  `%Array*` Qizil does not model);
-- `__quantum__qis__r__body(%Pauli, double, %Qubit*)` is treated as opaque
-  rather than risk a wrong Pauli-enum mapping;
-- rotations with symbolic (SSA) angles are never fused;
-- no gate *decomposition* or *resynthesis* beyond exact Clifford+T runs — Qizil
-  never expands a gate into a longer sequence to look for a win;
-- the equivalence checker is a dense simulator: 8 qubits on the dependency-free
-  backend, 12 with numpy installed;
-- multi-line LLVM instructions are handled for bracketed forms (`switch`) only.
-
-## Documentation
-
-| doc | what's in it |
-| --- | --- |
-| [`docs/VALIDATION.md`](docs/VALIDATION.md) | the correctness methodology: what's proven, how, and what explicitly is not |
-| [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) | measured performance, including two real defects found and fixed with before/after data |
-| [`docs/design.md`](docs/design.md) | why the codebase is built the way it is — qubit aliasing, barriers, the DAG, the normal form |
-| [`docs/design-system.md`](docs/design-system.md) | the UI's visual language and how to extend it |
-| [`docs/extending.md`](docs/extending.md) | adding a gate, a pass, or running the test suite |
-
-## License
-
-MIT.
+This is an offline analytic surface-code model in the style of the published Azure Quantum Resource Estimator [[3](#10-references)] — see [§10](#10-references) for the exact formulas and what "indicative" means for the T-factory figure.
 
 ---
 
-# Qizil — Türkçe
+## 3. The passes
 
-Qizil, **QIR** (Quantum Intermediate Representation) için yazılmış bir derleyici
-optimizasyon modülüdür. `.ll` veya `.bc` biçimindeki QIR dosyasını okur, kuantum
-komutlarından bir bağımlılık grafı (DAG) kurar, desen eşleştirmeli sadeleştirme
-uygular ve optimize edilmiş QIR üretir. Klasik komutlar, temel bloklar, ölçümler
-ve metadata **hiç dokunulmadan** korunur.
+Four passes, run to a fixed point (repeated until nothing more applies, or a level-dependent round cap):
+
+| pass | `-O` | what it does |
+|---|---|---|
+| `cancel` | 1, 2, 3 | deletes adjacent gate pairs whose product is the identity: `H·H`, `X·X`, `CX·CX`, `T·T†`, `Rz(θ)·Rz(−θ)` |
+| `merge-rotations` | 1, 2, 3 | fuses same-axis rotations on the same qubits: `Rz(θ₁)·Rz(θ₂) → Rz(θ₁+θ₂)`, and the two-qubit `Rxx/Ryy/Rzz` forms |
+| `commute` | 2, 3 | re-runs both passes above, searching *through* gates that provably commute with the candidate |
+| `clifford-t` | 2, 3 | collects a maximal same-axis run per qubit and re-emits the cheapest exact Clifford+T sequence for the total angle |
+
+**The algebra a rewrite is justified by.** Every single-qubit gate is normalized to `exp(i·φ) · R_axis(θ)`. Folding a run of same-axis gates is then addition — of angles, and separately of phases — in that normal form. There is no tolerance-fitting or numerical search anywhere in the rewrite logic itself: `H·H = I` and `Rz(a)·Rz(b) = Rz(a+b)` are algebraic facts, checked by construction.
+
+**The commutation rule.** Two gates commute when, on every qubit they share, both act through the same Pauli axis:
+
+| gate | axis | commutes with |
+|---|---|---|
+| `Rz`, `S`, `T`, `Z` | Z | anything diagonal on that qubit |
+| `Rx`, `X` | X | X-type gates on that qubit |
+| `CX(c,t)` | Z on `c`, X on `t` | Z-rotations on the control, X-rotations on the target |
+| `H`, `SWAP` | — | nothing it shares a qubit with |
+
+That is what lets `T · CX(q₀,q₁) · T` become `CX(q₀,q₁) · S`: the CNOT's control leg is diagonal, so the two `T`s move through it and meet.
+
+**Clifford+T resynthesis.** Every single-qubit gate is normalized, a run is summed, and the cheapest sequence reproducing the total is emitted:
+
+| total Z rotation | emitted | T-count |
+|---|---|---|
+| `0` | *(nothing)* | 0 |
+| `π/4` | `T` | 1 |
+| `π/2` | `S` | 0 |
+| `π` | `Z` | 0 |
+| anything else | `Rz(θ)` | needs synthesis [[4](#10-references)] |
+
+An `Rz` whose angle *happens* to land on a multiple of π/4 is replaced by exact Clifford+T rather than handed to a downstream rotation synthesizer — worth tens of `T` gates per rotation avoided.
+
+---
+
+## 4. Is the equivalence proof trustworthy?
+
+The claim the whole project is built around: `U(M′) = exp(i·φ)·U(M)` for every input `M` and output `M′`, exactly, with `φ` tracked and reported — never silently discarded. This is not asserted; it's checked, in five layers, each distrusting the one before it.
+
+1. **The algebra is closed-form.** Every rewrite is a checked algebraic identity — no tolerance-fitting anywhere in the rewrite logic. A claim about the design, not yet evidence about the code.
+2. **Every rewrite is checked against an independent reference simulator.** Both modules are split into segments at every non-unitary instruction; the segments must match *textually* first — so a rewrite can't hide a reordered measurement behind a matching matrix — then each gate run is recomputed from the actual gate matrices and compared numerically. Two independent backends, a dependency-free pure-Python simulator and a numpy-accelerated one, are cross-checked against each other.
+3. **A closed-form ground truth, not a self-reported one.** The QFT round-trip in [§2](#2-results) is the strongest single demonstration here, specifically because the answer — the identity — was known before the optimizer ran.
+4. **Breadth, not just depth.** 309 randomized circuits, spanning every gate, every optimization level, both simulator backends, are checked against layer 2 — because a handful of hand-built examples proves the algebra is sound, not that the implementation of the passes is free of ordinary bugs.
+5. **The checker itself is audited, not assumed correct.** The reference simulator is the oracle every layer above trusts. Its gate-application routine is cross-checked exhaustively against an independently-implemented dense embedding, over every gate arity and target ordering the project uses. This is not a hypothetical precaution — it is what caught a real bug (below) before it shipped.
+
+**What is not verified**, stated precisely because an unstated limitation is worse than a stated one: qubit count (8 exact, 12 with numpy — a compute ceiling, not an implementation gap), segment size within that ceiling, dynamic qubit operands, and — the one that was actually a bug once — `ok=True` requiring real evidence: a module where every segment gets skipped now reports `ok=False`, not a default-true with nothing checked. Full methodology: [`docs/VALIDATION.md`](docs/VALIDATION.md).
+
+---
+
+## 5. Where it can still go wrong
+
+**The `commute` pass, on many qubits with low gate density.** Its forward search has no early-stopping condition when most gate pairs share no qubit at all, giving `O(n²)` overall in that specific regime — measured deliberately to find the ceiling:
+
+| gates | qubits | time | ratio vs. 2× gates |
+|---|---|---|---|
+| 1,000 | 50 | 204 ms | — |
+| 4,000 | 200 | 1,990 ms | 5.44× |
+| 8,000 | 400 | 8,255 ms | 4.15× |
+
+This is a genuine algorithmic characteristic, not a bug: fixing it properly means threading a per-qubit "next relevant instruction" index through three correctness-critical passes, judged too risky to rush without the same exhaustive validation the verifier rewrite below received. Two things bound it instead: real algorithmic circuits — every shipped example included — have frequent multi-qubit gates, which keeps this search short in practice; and a `time_budget_s` safety net caps the worst case regardless, always safely, since every individual rewrite already preserves the unitary on its own.
+
+**Three real bugs, found and fixed before they shipped:**
+
+- **A cubic blowup in `clifford-t`.** It restarted its scan from the top of the block after every fold — `O(R)` rescans for `R` rewrites. Fixed with a single resumable sweep: 5,000 gates, 15,273 ms → 707 ms (21.6×).
+- **A verifier that was both slow, and once, silently wrong.** The numpy backend embedded each gate into a full matrix before multiplying — `O(dim³)`, 4,878 ms per gate at 12 qubits. A tensor-contraction rewrite passed initial benchmarks but was silently wrong for every multi-qubit gate, because `reshape()`'s bit ordering puts gate axis `i` at operand `k−1−i`, not `i` — an assumption that looks obviously correct and isn't. Caught only by an exhaustive cross-check against an independent dense-embedding oracle, not by the benchmark or by inspection. Final, correct version: 68 ms per gate (71.5×).
+- **"Verified" on zero evidence.** The checker defaulted `ok=True` and only ever set it `False` on an explicit mismatch, so a module where every segment got skipped still reported "verified." Fixed with an explicit guard, now a permanent regression test.
+
+Full numbers and the fourth, smaller find (a hidden-from-collection test-coverage gap): [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+
+---
+
+## 6. Engineering
+
+**Fixed-point driver with a time-budget safety net.** `optimize(..., time_budget_s=N)` checks a deadline at three granularities — between pipeline iterations, inside each pass's instruction loop, inside the shared forward-scan search — all at a 32-step interval, so one expensive call can't blow through the budget alone. A truncated run can only ever be less optimized, never incorrect.
+
+**484 tests**, covering 309 randomized circuits (both simulator backends), 24 shipped-example runs at every optimization level, 8 dedicated verifier-correctness tests (the exhaustive cross-check), and 33 control-flow/fidelity invariants — barriers never crossed, `-O0` is byte-identical.
+
+**CI matrix**: Python 3.10–3.13 on Ubuntu and macOS, a dedicated zero-optional-dependency job (the one that surfaced the hidden-test-collection bug above), a Windows smoke job, a ruff lint job, and a package build-install-smoke-test job.
+
+**Reproducible from a clone.** No dataset, no network access, no GPU. `pytest -q` runs the full suite in about 10 seconds.
+
+---
+
+## 7. Running it
+
+Two commands. No install, no dependencies, no virtualenv — any Python ≥ 3.10:
 
 ```console
-qizil input.ll -O2 -o output.ll --verify
+git clone https://github.com/egemensariaslan/qizil && cd qizil
+./qizil examples/trotter_step.ll -O3 -o optimized.ll --verify
 ```
 
-**Çalışma zamanı bağımlılığı yoktur.** Ayrıştırıcı, DAG, geçişler ve metrikler
-saf Python standart kütüphanesiyle yazılmıştır. PyQIR yalnızca bitcode
-okuma/yazma ve LLVM doğrulaması için, numpy yalnızca eşdeğerlik kontrolü için
-isteğe bağlı olarak kullanılır.
+```console
+qizil 0.2.0  examples/trotter_step.ll  (-O3)
 
-### Optimizasyon geçişleri
+  metric                   before      after   change
+  ----------------------------------------------------
+  gates                       100         72   -28.0%
+  1-qubit gates                76         50   -34.2%
+  2-qubit gates                24         22    -8.3%
+  arbitrary rotations          44         34   -22.7%
+  depth                        53         44   -17.0%
 
-| geçiş | `-O` | işlevi |
-| --- | --- | --- |
-| `cancel` | 1, 2, 3 | Çarpımı birim matris olan komşu kapı çiftlerini siler: `H·H`, `X·X`, `CNOT·CNOT`, `T·T†`, `Rz(θ)·Rz(−θ)` |
-| `merge-rotations` | 1, 2, 3 | Aynı eksendeki ardışık rotasyonları birleştirir: `Rz(θ₁)·Rz(θ₂) → Rz(θ₁+θ₂)` |
-| `commute` | 2, 3 | Değişmeli (commuting) kapıların arasından geçerek yukarıdaki iki dönüşümü tekrar arar |
-| `clifford-t` | 2, 3 | Bir kubit üzerindeki aynı eksenli kapı dizisini toplayıp en ucuz Clifford+T karşılığını üretir — `T`-kapısı sayısını düşürür |
+  passes: cancel x9, merge-rotations x9, commute x1  (2 iterations)
+  verify: unitary preserved over 1 segment(s), max error 2.27e-15
+```
 
-Değişme kuralı şudur: iki kapı, **paylaştıkları her kubit üzerinde** aynı Pauli
-ekseni boyunca etki ediyorsa yer değiştirebilir. Örneğin `CNOT`'un kontrol
-bacağı köşegen (`Z`) olduğu için `T · CNOT · T` ifadesi `CNOT · S` hâline gelir;
-`T` sayısı 2'den 0'a iner.
+`--verify` is the only flag that wants a dependency (numpy) — without it, verification reports `skipped`, never a false pass.
 
-### Doğruluk güvencesi
+### Four ways in
 
-Devrenin üniter matrisi birebir korunur ve bu **varsayılmaz, kontrol edilir**:
-`qizil verify` (veya `--verify`) iki modülü ölçüm/klasik komut sınırlarında
-parçalara böler, sınır komutlarının metinsel olarak aynı kaldığını doğrular ve
-her kapı dizisini bir referans simülatörle karşılaştırır. Global faz atılmaz;
-`Module.global_phase` alanında izlenir ve raporlanır.
+| interface | for | try it |
+|---|---|---|
+| **Command line** | a build script or CI step | `qizil in.ll -O3 -o out.ll --verify` |
+| **Python API** | embedding in a larger pipeline | `qizil.optimize("c.ll", level=3, verify=True)` |
+| **Browser UI** | watching a level do its work live | `qizil ui` → `http://127.0.0.1:8731` |
+| **Standalone report** | a PR comment or paper appendix | `qizil report in.ll -o report.html` |
 
-Şunlara asla dokunulmaz: temel blok sınırları, ölçümler, `__quantum__rt__*`
-çağrıları, tanınmayan kapılar, `__ctl` fonktorları, statik olmayan kubit
-işaretçileri ve sembolik (SSA) açılı rotasyonlar. Bunlar zamanlama bariyeri
-olarak ele alınır. Yeniden yazılmayan her satır **bayt bayt** aynen çıktıya
-aktarılır; `-O0` çıktısı girdinin birebir aynısıdır.
+```python
+import qizil
 
-### Kaynak tahmini (Resource Estimator)
+result = qizil.optimize("circuit.ll", level=2, verify=True)
+print(result.before.gates, "->", result.after.gates)
+print(result.verification.ok)               # True
+open("out.ll", "w").write(result.to_ll())
+```
 
-`qizil estimate input.ll -O2` komutu, optimizasyon öncesi ve sonrası için
-fiziksel kubit sayısı, kod mesafesi, mantıksal derinlik, `T` durumu sayısı ve
-çalışma süresi farkını raporlar. Varsayılan `local` arka ucu, Azure Quantum
-Resource Estimator'ın yayımlanmış yüzey-kod modelini (arXiv:2211.07629) çevrimdışı
-olarak uygular; `T`-fabrikası ayak izi basitleştirilmiş 15-to-1 modeliyle
-hesaplandığı için yaklaşık değerdir. Kesin sonuç için
-`qizil.analysis.estimator.estimate_azure()` modülü gerçek `microsoft.estimator`
-hedefine gönderir.
+Useful flags on `optimize`: `-O0`…`-O3` (pipeline selection), `--passes cancel,commute` (run exactly these), `--gateset strict` (never introduce a gate the input didn't already use), `--preserve-global-phase`, `--report r.json`. Every subcommand and flag: `qizil --help`.
+
+---
+
+## 8. Repository layout
+
+```
+src/qizil/
+├── ir/          parser, operand model, gate table, per-block DAG, byte-exact emitter
+├── passes/      cancel, merge-rotations, commute, clifford-t, the shared algebra, the fixed-point driver
+├── analysis/    circuit metrics and the resource estimator
+├── verify/      the two reference simulators and the equivalence checker
+└── ui/          the browser UI and the standalone-report renderer
+
+examples/        hand-built and generated .ll modules, including the QFT round-trip
+tests/           484 tests
+docs/            design rationale, validation methodology, benchmarks, this file's diagrams
+```
+
+Module-by-module detail: [`docs/design.md`](docs/design.md).
+
+---
+
+## 9. Known limitations
+
+Listed here rather than left for a reviewer to find. Each one is deliberate and fails safe — the code is left alone rather than risk a wrong rewrite.
+
+- Rewrites are **intra-block only**; no cross-block or loop-level optimization exists yet.
+- `__ctl` / `__ctladj` functors are opaque everywhere, including verification — their control operand is an `%Array*` Qizil does not model.
+- `__quantum__qis__r__body(%Pauli, double, %Qubit*)` is opaque rather than risk a wrong Pauli-enum mapping.
+- No gate **decomposition or resynthesis** beyond exact Clifford+T runs — Qizil never expands a gate into a longer sequence looking for a win.
+- The equivalence checker is a dense simulator: 8 qubits dependency-free, 12 with numpy — a compute ceiling, not an engineering gap.
+- **No real-world QIR corpus** from an actual Q#/Qiskit compiler has been run through it yet — every result above is from hand-built and generated examples plus randomized synthetic circuits.
+- **Not on PyPI yet.** Install today is `git clone` + `./qizil`, fully functional but not yet a one-line `pip install`.
+
+---
+
+## 10. References
+
+**The intermediate representation and the platform it optimizes for**
+
+1. QIR Alliance. *QIR Specification.* [github.com/qir-alliance/qir-spec](https://github.com/qir-alliance/qir-spec) — the IR every module here is parsed from and emitted to.
+2. LLVM Project. *LLVM Language Reference Manual.* [llvm.org/docs/LangRef.html](https://llvm.org/docs/LangRef.html) — the textual `.ll` grammar QIR is built on.
+3. Beverland, M. E., Murali, P., Troyer, M., Svore, K. M., Hoefler, T., Kliuchnikov, V., Low, G. H., Soeken, M., Sundaram, A. & Vaschillo, A. (2022). *Assessing requirements to scale to practical quantum advantage.* [arXiv:2211.07629](https://arxiv.org/abs/2211.07629) — the surface-code cost model `qizil estimate` implements offline.
+
+**The algebra**
+
+4. Ross, N. J. & Selinger, P. (2016). *Optimal ancilla-free Clifford+T approximation of z-rotations.* Quantum Information & Computation. [arXiv:1403.2975](https://arxiv.org/abs/1403.2975) — the general rotation-synthesis problem the Clifford+T ladder in [§3](#3-the-passes) sits next to; Qizil handles only the exact case (angles that are already multiples of π/4) and defers the general case to a real synthesizer rather than approximate it silently.
+5. Nielsen, M. A. & Chuang, I. L. (2010). *Quantum Computation and Quantum Information* (10th anniversary ed.). Cambridge University Press — the Pauli-operator algebra behind the normal form and the commutation rule in [§3](#3-the-passes).
+
+---
+
+## Licence and citation
+
+Everything — source, docs and examples — is under the **MIT License** ([LICENSE](LICENSE)).
+
+`CITATION.cff` in the repository root lets GitHub render a *Cite this repository* button. If you cite a specific figure, please say which example or test it came from — the shipped-example table in [§2](#2-results) and the randomized-suite counts in [§6](#6-engineering) measure different things.
+
+> Sarıaslan, E. (2026). *Qizil: A Peephole and Commutation Optimizer for Quantum Intermediate Representation* (Version 0.2.0) [Computer software].
+
+## Author
+
+**Egemen Sarıaslan** — Microsoft AI/ML Summer Internship Programme, 2026,
+supervised by Cloud Solution Architects Management.
+
+Questions about the algebra — or the verifier in particular — are welcome as issues.
